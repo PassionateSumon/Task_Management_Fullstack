@@ -38,6 +38,10 @@ export default (sequelize: any, DataType: any) => {
         type: DataType.DATE,
         allowNull: true,
       },
+      completed_date: {
+        type: DataType.DATE,
+        allowNull: true,
+      },
     },
     { tableName: "Task", timestamps: true }
   );

@@ -46,8 +46,12 @@ export default (sequelize: any, DataType: any) => {
         defaultValue: null,
       },
       user_type: {
-        type: DataType.ENUM("admin", "user"),
+        type: DataType.ENUM("admin", "user", "super_admin"),
         allowNull: false,
+      },
+      workspace_id: {
+        type: DataType.INTEGER,
+        allowNull: true,
       },
     },
     { tableName: "User", timestamps: true }
