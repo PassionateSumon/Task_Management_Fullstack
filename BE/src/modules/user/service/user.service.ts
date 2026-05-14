@@ -1,141 +1,41 @@
-import { db } from "../../../config/db.js";
 import { withTransaction } from "../../../common/utils/transaction.js";
+import type { UserRepository } from "../../../infrastructure/persistence/user.repository.js";
 
-export const getAllUsersService = async (userId: number) => {
-  try {
-    const users = await withTransaction(async (transaction) => {
-      return db.User.findAll({
-        attributes: { exclude: ["password"] },
-        where: {
-          id: {
-            [db.Sequelize.Op.ne]: userId,
-          },
-        },
-        transaction,
+export class UserService {
+  constructor(private readonly users: UserRepository) {}
+
+  async getAllUsers(userId: number) {
+    try {
+      const users = await withTransaction(async (transaction) => {
+        return this.users.findAllExceptUserId(userId, transaction);
       });
-    });
-    if (!users) {
-      return {
-        statusCode: 404,
-        message: "Users not found",
-        data: null,
-      };
-    }
-    return {
-      statusCode: 200,
-      message: "Users fetched successfully",
-      data: users,
-    };
-  } catch (err: any) {
-    return {
-      statusCode: 500,
-      message: err.message || "Internal server error",
-      data: null,
-    };
-  }
-};
-
-export const getSingleUserService = async (
-  id: number | string,
-  userId: number
-) => {
-  try {
-    const currId = id === "null" ? userId : id;
-    const user = await withTransaction(async (transaction) => {
-      return db.User.findOne({
-        where: { id: currId },
-        attributes: { exclude: ["password"] },
-        transaction,
-      });
-    });
-    if (!user) {
-      return {
-        statusCode: 404,
-        message: "User not found",
-        data: null,
-      };
-    }
-    return {
-      statusCode: 200,
-      message: "User fetched successfully",
-      data: user,
-    };
-  } catch (err: any) {
-    return {
-      statusCode: 500,
-      message: err.message || "Internal server error",
-      data: null,
-    };
-  }
-};
-
-export const updateDetailsService = async (
-  id: number,
-  data: { name: string }
-) => {
-  // console.log(data)
-  try {
-    return await withTransaction(async (transaction) => {
-      const existedUser = await db.User.findOne({ where: { id }, transaction });
-      if (!existedUser) {
+      if (!users) {
         return {
           statusCode: 404,
-          message: "User not found",
+          message: "Users not found",
           data: null,
         };
       }
-      await db.User.update(data, { where: { id }, transaction });
-      const finalRes = await db.User.findOne({ where: { id }, transaction });
       return {
         statusCode: 200,
-        message: "User updated successfully",
-        data: finalRes,
+        message: "Users fetched successfully",
+        data: users,
       };
-    });
-  } catch (err: any) {
-    return {
-      statusCode: 500,
-      message: err.message || "Internal server error",
-      data: null,
-    };
-  }
-};
-
-export const toggleActiveService = async (id: number) => {
-  try {
-    return await withTransaction(async (transaction) => {
-      const existedUser = await db.User.findOne({ where: { id }, transaction });
-      if (!existedUser) {
-        return {
-          statusCode: 404,
-          message: "User not found",
-          data: null,
-        };
-      }
-      await db.User.update(
-        { isActive: !existedUser.isActive },
-        { where: { id }, transaction }
-      );
-      const finalRes = await db.User.findOne({ where: { id }, transaction });
+    } catch (err: any) {
       return {
-        statusCode: 200,
-        message: "User updated successfully",
-        data: finalRes,
+        statusCode: 500,
+        message: err.message || "Internal server error",
+        data: null,
       };
-    });
-  } catch (err: any) {
-    return {
-      statusCode: 500,
-      message: err.message || "Internal server error",
-      data: null,
-    };
+    }
   }
-};
 
-export const deleteUserService = async (id: number) => {
-  try {
-    return await withTransaction(async (transaction) => {
-      const user = await db.User.findOne({ where: { id }, transaction });
+  async getSingleUser(id: number | string, userId: number) {
+    try {
+      const currId = id === "null" ? userId : id;
+      const user = await withTransaction(async (transaction) => {
+        return this.users.findOneByIdExcludePassword(currId, transaction);
+      });
       if (!user) {
         return {
           statusCode: 404,
@@ -143,18 +43,104 @@ export const deleteUserService = async (id: number) => {
           data: null,
         };
       }
-      await db.User.destroy({ where: { id }, transaction });
       return {
         statusCode: 200,
-        message: "User deleted successfully",
-        data: { id: id },
+        message: "User fetched successfully",
+        data: user,
       };
-    });
-  } catch (err: any) {
-    return {
-      statusCode: 500,
-      message: err.message || "Internal server error",
-      data: null,
-    };
+    } catch (err: any) {
+      return {
+        statusCode: 500,
+        message: err.message || "Internal server error",
+        data: null,
+      };
+    }
   }
-};
+
+  async updateDetails(id: number, data: { name: string }) {
+    try {
+      return await withTransaction(async (transaction) => {
+        const existedUser = await this.users.findOneById(id, transaction);
+        if (!existedUser) {
+          return {
+            statusCode: 404,
+            message: "User not found",
+            data: null,
+          };
+        }
+        await this.users.updateById(id, data, transaction);
+        const finalRes = await this.users.findOneById(id, transaction);
+        return {
+          statusCode: 200,
+          message: "User updated successfully",
+          data: finalRes,
+        };
+      });
+    } catch (err: any) {
+      return {
+        statusCode: 500,
+        message: err.message || "Internal server error",
+        data: null,
+      };
+    }
+  }
+
+  async toggleActive(id: number) {
+    try {
+      return await withTransaction(async (transaction) => {
+        const existedUser = await this.users.findOneById(id, transaction);
+        if (!existedUser) {
+          return {
+            statusCode: 404,
+            message: "User not found",
+            data: null,
+          };
+        }
+        await this.users.updateById(
+          id,
+          { isActive: !existedUser.isActive },
+          transaction
+        );
+        const finalRes = await this.users.findOneById(id, transaction);
+        return {
+          statusCode: 200,
+          message: "User updated successfully",
+          data: finalRes,
+        };
+      });
+    } catch (err: any) {
+      return {
+        statusCode: 500,
+        message: err.message || "Internal server error",
+        data: null,
+      };
+    }
+  }
+
+  async deleteUser(id: number) {
+    try {
+      return await withTransaction(async (transaction) => {
+        const user = await this.users.findOneById(id, transaction);
+        if (!user) {
+          return {
+            statusCode: 404,
+            message: "User not found",
+            data: null,
+          };
+        }
+        await this.users.destroyById(id, transaction);
+        return {
+          statusCode: 200,
+          message: "User deleted successfully",
+          data: { id: id },
+        };
+      });
+    } catch (err: any) {
+      return {
+        statusCode: 500,
+        message: err.message || "Internal server error",
+        data: null,
+      };
+    }
+  }
+}

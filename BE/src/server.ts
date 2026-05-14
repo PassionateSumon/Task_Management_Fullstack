@@ -2,13 +2,13 @@ import Hapi, { Request } from "@hapi/hapi";
 import dotenv from "dotenv";
 import Jwt from "@hapi/jwt";
 import Cookie from "@hapi/cookie";
-import jwt from "jsonwebtoken";
 import { registerSwagger } from "./plugins/swagger.plugin.js";
 import { ApiError } from "./common/utils/ApiError.js";
-import { withTransaction } from "./common/utils/transaction.js";
-import { statusCodes } from "./common/constants/constants.js";
-import { db, connectDB } from "./config/db.js";
+import { connectDB } from "./config/db.js";
 import routesPlugin from "./plugins/routes.plugin.js";
+import { getAppContainer } from "./composition/app-container.js";
+import { CookieAuthValidators } from "./infrastructure/auth/cookie-auth.validators.js";
+
 dotenv.config();
 
 const requiredEnvVars = [
@@ -26,126 +26,12 @@ if (missingEnvVars.length > 0) {
   process.exit(1);
 }
 
-const verifyToken = (token: string, secret: string) => {
-  try {
-    return jwt.verify(token, secret) as { userId: string };
-  } catch (err) {
-    throw new ApiError("Invalid or expired token", 401);
-  }
-};
-
-const validateAccess = async (req: Hapi.Request, token: string) => {
-  try {
-    // console.log("validate --> ",token)
-    if (!token) {
-      throw new ApiError("No accessToken found in Cookie!", 401);
-    }
-    const accessSecret = process.env.JWT_ACCESS_SECRET;
-    if (!accessSecret) {
-      throw new ApiError("Access Secret is not found in environment!", 401);
-    }
-    // console.log("validate --> ",accessSecret)
-
-    const decoded = verifyToken(token, accessSecret) as any;
-    // console.log("validate --> ",decoded)
-
-    const user = await withTransaction(async (transaction) => {
-      return await db.User.findOne({
-        where: { id: decoded?.userId },
-        transaction,
-      });
-    });
-    if (!user || !user.isActive) {
-      throw new ApiError("User not found or inactive!", 401);
-    }
-
-    const tokenIssuedAt = decoded?.iat as number | undefined;
-    const lastLogoutAt = user?.lastLogoutAt
-      ? Math.floor(new Date(user.lastLogoutAt).getTime() / 1000)
-      : null;
-
-    if (lastLogoutAt && (!tokenIssuedAt || tokenIssuedAt < lastLogoutAt)) {
-      throw new ApiError("Token has been revoked. Please login again.", 401);
-    }
-
-    return {
-      isValid: true,
-      credentials: { userId: decoded?.userId, roleId: decoded?.roleId },
-    };
-  } catch (error: any) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError("Internal server error at validate-access!", 500);
-  }
-};
-
-const validateRefresh = async (req: Hapi.Request) => {
-  try {
-    const token = req.state.refreshToken;
-    if (!token) {
-      throw new ApiError(
-        "No refreshToken found in Cookie!",
-        statusCodes.UNAUTHORIZED
-      );
-    }
-    const refreshSecret = process.env.JWT_REFRESH_SECRET;
-    if (!refreshSecret) {
-      throw new ApiError(
-        "Refresh Secret not found in environment!",
-        statusCodes.UNAUTHORIZED
-      );
-    }
-
-    const decoded = verifyToken(token, refreshSecret) as any;
-
-    const refreshToken = await withTransaction(async (transaction) => {
-      return await db.RefreshToken.findOne({
-        where: { token, userId: decoded.userId },
-        transaction,
-      });
-    });
-    if (!refreshToken || refreshToken.expiresAt < new Date()) {
-      throw new ApiError(
-        "Invalid or expired refresh token!",
-        statusCodes.UNAUTHORIZED
-      );
-    }
-
-    const user = await withTransaction(async (transaction) => {
-      return await db.User.findOne({
-        where: { id: decoded.userId },
-        transaction,
-      });
-    });
-    if (!user || !user.isActive) {
-      throw new ApiError(
-        "User not found or inactive!",
-        statusCodes.UNAUTHORIZED
-      );
-    }
-
-    return {
-      isValid: true,
-      credentials: { userId: decoded?.userId, roleId: decoded?.roleId },
-    };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(
-      "Internal server error at validate-refresh!",
-      statusCodes.SERVER_ISSUE
-    );
-  }
-};
-
 const ORIGIN =
   (process.env.NODE_ENV === "production"
     ? process.env.PROD_ORIGIN
     : process.env.DEV_ORIGIN) ?? "http://localhost:3000";
 
-console.log("origin: ", ORIGIN)
+console.log("origin: ", ORIGIN);
 
 const init = async () => {
   const server = Hapi.server({
@@ -180,6 +66,12 @@ const init = async () => {
   await server.register(Cookie);
   await registerSwagger(server);
 
+  const container = getAppContainer();
+  const cookieAuth = new CookieAuthValidators(
+    container.userRepository,
+    container.refreshTokenRepository
+  );
+
   server.auth.strategy("jwt_access", "cookie", {
     cookie: {
       name: "accessToken",
@@ -190,13 +82,13 @@ const init = async () => {
       ttl: 1 * 24 * 60 * 60 * 1000,
       path: "/",
     },
-    validate: validateAccess,
+    validate: cookieAuth.validateAccess,
   });
 
   server.auth.scheme("custom-refresh", () => {
     return {
       authenticate: async (request: Hapi.Request, h: Hapi.ResponseToolkit) => {
-        const result = (await validateRefresh(request)) as any;
+        const result = (await cookieAuth.validateRefresh(request)) as any;
         if (!result.isValid) {
           throw new ApiError("Refresh token validation failed", 401);
         }
@@ -209,7 +101,6 @@ const init = async () => {
 
   server.auth.default("jwt_access");
 
-  // if (process.env.NODE_ENV !== "production") {
   server.events.on("response", function (req: Request) {
     console.log(
       `${req.info.remoteAddress}: ${req.method.toUpperCase()} ${req.path} --> ${
@@ -217,7 +108,6 @@ const init = async () => {
       }`
     );
   });
-// }
 
   try {
     await connectDB();

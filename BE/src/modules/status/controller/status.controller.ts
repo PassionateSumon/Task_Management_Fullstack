@@ -1,16 +1,13 @@
 import { Request, ResponseToolkit } from "@hapi/hapi";
 import { error, success } from "../../../common/utils/returnFunctions.js";
-import {
-  createstatusService,
-  deleteStatusService,
-  getAllStatusService,
-  updateStatusService,
-} from "../service/status.service.js";
+import { getAppContainer } from "../../../composition/app-container.js";
+
+const status = () => getAppContainer().statusService;
 
 export const createStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const payload = req.payload as any;
-    const result = await createstatusService(payload);
+    const result = await status().createStatus(payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status created successfully", 200)(h);
@@ -21,7 +18,7 @@ export const createStatusHandler = async (req: Request, h: ResponseToolkit) => {
 
 export const getAllStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
-    const result = await getAllStatusService();
+    const result = await status().getAllStatuses();
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status fetched successfully", 200)(h);
@@ -32,8 +29,8 @@ export const getAllStatusHandler = async (req: Request, h: ResponseToolkit) => {
 
 export const updateStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
-    const payload = req.payload as { id: number, name: string }
-    const result = await updateStatusService(payload);
+    const payload = req.payload as { id: number; name: string };
+    const result = await status().updateStatus(payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status updated successfully", 200)(h);
@@ -44,8 +41,8 @@ export const updateStatusHandler = async (req: Request, h: ResponseToolkit) => {
 
 export const deleteStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
-    const payload = req.payload as { id: number }
-    const result = await deleteStatusService(payload);
+    const payload = req.payload as { id: number };
+    const result = await status().deleteStatus(payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status deleted successfully", 200)(h);

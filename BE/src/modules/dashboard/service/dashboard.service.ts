@@ -1,422 +1,201 @@
-import { db } from "../../../config/db.js";
 import { statusCodes } from "../../../common/constants/constants.js";
 import { withTransaction } from "../../../common/utils/transaction.js";
+import type { UserRepository } from "../../../infrastructure/persistence/user.repository.js";
+import type { TaskRepository } from "../../../infrastructure/persistence/task.repository.js";
+import type { StatusRepository } from "../../../infrastructure/persistence/status.repository.js";
 
-const priorities = ["high", "medium", "low"];
+export class DashboardService {
+  constructor(
+    private readonly users: UserRepository,
+    private readonly tasks: TaskRepository,
+    private readonly statuses: StatusRepository
+  ) {}
 
-const getDashBoardService = async () => {
-  try {
-    return await withTransaction(async (transaction) => {
-      const { User, Task, Status, sequelize } = db;
-      const currentDate = new Date();
+  async getDashboard() {
+    try {
+      return await withTransaction(async (transaction) => {
+        const currentDate = new Date();
 
-      // 1. Count active users (excluding admins)
-      const activeUsersCount = await User.count({
-        where: { isActive: true, user_type: "user" },
-        transaction,
-      });
+        const activeUsersCount = await this.users.countActiveNonAdminUsers(
+          transaction
+        );
 
-      // 2. Total tasks
-      const totalTasks = await Task.count({ transaction });
+        const totalTasks = await this.tasks.countAll(transaction);
 
-      // 3. Tasks grouped by status
-      const tasksByStatusRaw = await Status.findAll({
-        attributes: ["id", "name"],
-        include: [{ model: db.Task, as: "tasks" }],
-        transaction,
-      });
+        const tasksByStatusRaw = await this.statuses.findAllWithTasks(
+          transaction
+        );
 
-    // 4. Tasks grouped by priority
-      const tasksByPriorityRaw = await Task.findAll({
-        attributes: ["priority", [sequelize.literal("COUNT(*)"), "count"]],
-        group: "priority",
-        raw: true,
-        transaction,
-      });
-    // console.log(tasksByPriorityRaw)
+        const tasksByPriorityRaw = await this.tasks.findGroupedByPriority(
+          transaction
+        );
 
-    // 5. Overdue tasks
-      const overdueTasks = await Task.count({
-        where: { end_date: { [db.Sequelize.Op.lt]: currentDate } },
-        include: [
-          {
-            model: db.Status,
-            as: "status",
-            where: { name: { [db.Sequelize.Op.notIn]: ["Done", "Completed"] } },
-          },
-        ],
-        transaction,
-      });
+        const overdueTasks = await this.tasks.countOverdue(
+          currentDate,
+          transaction
+        );
 
-    // 6. Recent tasks (last 5)
-      const recentTasks = await Task.findAll({
-      attributes: [
-        "id",
-        "task_name",
-        "task_description",
-        "priority",
-        "start_date",
-        "end_date",
-        "createdAt",
-        "updatedAt",
-      ],
-      include: [
-        {
-          model: db.User,
-          as: "user",
-          attributes: ["id", "name", "email", "username"],
-        },
-        { model: db.Status, as: "status", attributes: ["id", "name"] },
-      ],
-      order: [["createdAt", "DESC"]],
-      limit: 5,
-        raw: true,
-        nest: true,
-        transaction,
-      });
+        const recentTasks = await this.tasks.findRecentWithUserAndStatus(
+          transaction
+        );
 
-    // 7. Recent users (last 5, excluding sensitive fields)
-      const recentUsers = await User.findAll({
-      attributes: { exclude: ["password", "otp"] },
-      where: { user_type: "user" },
-      order: [["createdAt", "DESC"]],
-      limit: 5,
-        raw: true,
-        transaction,
-      });
+        const recentUsers = await this.users.findRecentUsersForDashboard(
+          transaction
+        );
 
-    // 8. Monthly task report (current year)
-      const currentYear = currentDate.getFullYear();
-      const monthlyTasks = await Task.findAll({
-      attributes: [
-        [
-          sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m"),
-          "month",
-        ],
-        [sequelize.literal("COUNT(*)"), "count"],
-      ],
-      where: {
-        createdAt: {
-          [db.Sequelize.Op.gte]: new Date(currentYear, 0, 1),
-          [db.Sequelize.Op.lte]: new Date(currentYear, 11, 31, 23, 59, 59, 999),
-        },
-      },
-      group: [sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m")],
-        raw: true,
-        transaction,
-      });
+        const currentYear = currentDate.getFullYear();
+        const monthlyTasks = await this.tasks.findMonthlyTasks(
+          currentYear,
+          transaction
+        );
 
-    // 9. Weekly task report (current month)
-      const currentMonth = currentDate.getMonth();
-      const weeklyTasks = await Task.findAll({
-      attributes: [
-        [sequelize.fn("YEAR", sequelize.col("createdAt")), "year"],
-        [sequelize.fn("WEEK", sequelize.col("createdAt"), 1), "week"],
-        [sequelize.fn("COUNT", sequelize.col("id")), "count"],
-      ],
-      where: {
-        createdAt: {
-          [db.Sequelize.Op.gte]: new Date(currentYear, currentMonth, 1),
-          [db.Sequelize.Op.lte]: new Date(
-            currentYear,
-            currentMonth + 1,
-            0,
-            23,
-            59,
-            59,
-            999
-          ),
-        },
-      },
-      group: [
-        sequelize.fn("YEAR", sequelize.col("createdAt")),
-        sequelize.fn("WEEK", sequelize.col("createdAt"), 1),
-      ],
-      order: [
-        [sequelize.fn("YEAR", sequelize.col("createdAt")), "ASC"],
-        [sequelize.fn("WEEK", sequelize.col("createdAt"), 1), "ASC"],
-      ],
-        raw: true,
-        transaction,
-      });
+        const currentMonth = currentDate.getMonth();
+        const weeklyTasks = await this.tasks.findWeeklyTasks(
+          currentYear,
+          currentMonth,
+          transaction
+        );
 
-    // console.log(weeklyTasks);
+        const yearlyTasks = await this.tasks.findYearlyByStartDate(transaction);
 
-    // 10. Yearly task report
-      const yearlyTasks = await Task.findAll({
-      attributes: [
-        [sequelize.fn("YEAR", sequelize.col("start_date")), "year"],
-        [sequelize.fn("COUNT", sequelize.col("id")), "count"],
-      ],
-      where: {
-        start_date: {
-          [db.Sequelize.Op.ne]: null, // exclude tasks with null start_date
-        },
-      },
-      group: [sequelize.fn("YEAR", sequelize.col("start_date"))],
-        raw: true,
-        transaction,
-      });
+        const completedTasks = await this.tasks.countCompleted(transaction);
+        const completionRate =
+          totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
-    // 11. Task completion rate
-      const completedTasks = await Task.count({
-      include: [
-        {
-          model: db.Status,
-          as: "status",
-          where: { name: { [db.Sequelize.Op.in]: ["Done", "Completed"] } },
-        },
-        ],
-        transaction,
-      });
-      const completionRate =
-        totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+        const tasksPerUser = await this.tasks.findTasksPerUser(transaction);
 
-    // 12. Tasks per user
-      const tasksPerUser = await Task.findAll({
-      attributes: [
-        [sequelize.col("user.id"), "userId"],
-        [sequelize.col("user.name"), "userName"],
-        [sequelize.literal("COUNT(*)"), "taskCount"],
-      ],
-      include: [
-        {
-          model: db.User,
-          as: "user",
-          attributes: [],
-          where: { user_type: "user" },
-        },
-      ],
-      group: ["user.id", "user.name"],
-        raw: true,
-        transaction,
-      });
+        const avgTaskDuration = await this.tasks.findAvgDurationCompleted(
+          transaction
+        );
 
-    // 13. Average task duration (completed tasks)
-      const avgTaskDuration = await Task.findOne({
-      attributes: [
-        [
-          sequelize.fn(
-            "AVG",
-            sequelize.fn(
-              "TIMESTAMPDIFF",
-              sequelize.literal("DAY"),
-              sequelize.col("start_date"),
-              sequelize.col("end_date")
-            )
-          ),
-          "avgDurationDays",
-        ],
-      ],
-      where: {
-        start_date: { [db.Sequelize.Op.ne]: null },
-        end_date: { [db.Sequelize.Op.ne]: null },
-      },
-      include: [
-        {
-          model: db.Status,
-          as: "status",
-          where: { name: { [db.Sequelize.Op.in]: ["Done", "Completed"] } },
-          attributes: [],
-        },
-      ],
-        raw: true,
-        transaction,
-      });
+        const thirtyDaysAgo = new Date(
+          currentDate.getTime() - 30 * 24 * 60 * 60 * 1000
+        );
+        const statusTrends = await this.tasks.findStatusTrends(
+          thirtyDaysAgo,
+          transaction
+        );
 
-    // 14. Task status trends (tasks moved to Done/Completed in last 30 days, non-raw)
-      const statusTrends = await Task.findAll({
-      attributes: [
-        [sequelize.fn("DATE", sequelize.col("Task.updatedAt")), "date"],
-        [sequelize.fn("COUNT", sequelize.col("Task.id")), "count"],
-      ],
-      where: {
-        updatedAt: {
-          [db.Sequelize.Op.gte]: new Date(
-            currentDate.getTime() - 30 * 24 * 60 * 60 * 1000
-          ),
-        },
-      },
-      include: [
-        {
-          model: Status,
-          as: "status",
-          where: { name: { [db.Sequelize.Op.in]: ["Done", "Completed"] } },
-          attributes: [],
-        },
-      ],
-        group: [sequelize.fn("DATE", sequelize.col("Task.updatedAt"))],
-        transaction,
-      });
+        const activeUsersLast30Days =
+          await this.users.countUsersWithRecentTaskActivity(
+            thirtyDaysAgo,
+            transaction
+          );
 
-    // 15. Active users in last 30 days (users who created or updated tasks, non-raw)
-      const activeUsersLast30Days = await User.count({
-      where: { user_type: "user" },
-      include: [
-        {
-          model: Task,
-          as: "tasks",
-          where: {
-            [db.Sequelize.Op.or]: [
-              {
-                createdAt: {
-                  [db.Sequelize.Op.gte]: new Date(
-                    currentDate.getTime() - 30 * 24 * 60 * 60 * 1000
-                  ),
-                },
-              },
-              {
-                updatedAt: {
-                  [db.Sequelize.Op.gte]: new Date(
-                    currentDate.getTime() - 30 * 24 * 60 * 60 * 1000
-                  ),
-                },
-              },
-            ],
-          },
-          attributes: [],
-          required: true,
-        },
-      ],
-        distinct: true,
-        transaction,
-      });
+        const allIsActiveUsers =
+          await this.users.findAllBasicUsersWithActiveFlag(transaction);
 
-    // 16. all users with isActive status
-      const allIsActiveUsers = await User.findAll({
-        where: { user_type: "user" },
-        attributes: ["id", "name", "email", "isActive"],
-        transaction,
-      });
-    // console.log(JSON.stringify(allIsActiveUsers));
-
-    // Format response
-      const dashboardData: any = {
-        activeUsers: activeUsersCount,
-        totalTasks,
-        tasksByStatus: tasksByStatusRaw.map((status: any) => ({
-          statusId: status.id,
-          statusName: status.name,
-          tasksCount: status.tasks.length,
-        })),
-        tasksByPriority: tasksByPriorityRaw.reduce(
-          (acc: Record<string, number>, task: any) => {
-            acc[task.priority] = parseInt(task.count, 10);
-            return acc;
-          },
-          {}
-        ),
-        overdueTasks,
-        recentTasks,
-        recentUsers,
-        monthlyTasks,
-        weeklyTasks,
-        yearlyTasks,
-        completionRate: parseFloat(completionRate.toFixed(2)),
-        tasksPerUser,
-        avgTaskDurationDays: avgTaskDuration?.avgDurationDays
-          ? parseFloat(avgTaskDuration?.avgDurationDays)
-          : null,
-        statusTrends,
-        activeUsersLast30Days,
-        allIsActiveUsers,
-      };
-
-      return {
-        statusCode: statusCodes.SUCCESS,
-        message: "Dashboard data retrieved successfully",
-        data: dashboardData,
-      };
-    });
-  } catch (err: any) {
-    console.error("Error in getDashBoardService:", err);
-    return {
-      statusCode: statusCodes.SERVER_ISSUE,
-      message: err.message || "Internal server error",
-      data: null,
-    };
-  }
-};
-
-const getDashBoardServiceForUser = async (userId: number) => {
-  try {
-    return await withTransaction(async (transaction) => {
-      const { Task, Status, sequelize } = db;
-      const tasks = await Task.findAll({
-        where: { user_id: userId },
-        include: [
-          {
-            model: Status,
-            as: "status",
-          },
-        ],
-        transaction,
-      });
-      const totalTasks = tasks.length;
-      const completedTasks = tasks.filter(
-        (task: any) =>
-          task.status.name === "Done" || task.status.name === "Completed"
-      ).length;
-      const completionRate =
-        totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-      const pendingTasks = tasks.filter(
-        (task: any) =>
-          task.status.name !== "Done" && task.status.name !== "Completed"
-      ).length;
-      const overdueTasks = tasks.filter(
-        (task: any) =>
-          task.end_date < new Date() &&
-          task.status.name !== "Done" &&
-          task.status.name !== "Completed"
-      ).length;
-
-      const tasksByStatus = await Task.findAll({
-        where: { user_id: userId },
-        include: [{ model: Status, as: "status" }],
-        attributes: ["status_id", [sequelize.literal("COUNT(*)"), "count"]],
-        group: "status_id",
-        raw: true,
-        transaction,
-      });
-      const tasksByPriority = await Task.findAll({
-        attributes: ["priority", [sequelize.literal("COUNT(*)"), "count"]],
-        where: { user_id: userId },
-        group: "priority",
-        raw: true,
-        transaction,
-      });
-
-      return {
-        statusCode: statusCodes.SUCCESS,
-        message: "User dashboard data retrieved successfully",
-        data: {
+        const dashboardData: Record<string, unknown> = {
+          activeUsers: activeUsersCount,
           totalTasks,
-          completedTasks,
-          completionRate: parseFloat(completionRate.toFixed(2)),
-          pendingTasks,
-          overdueTasks,
-          tasksByStatus: tasksByStatus.map((task: any) => ({
-            statusId: task.status_id,
-            statusName: task["status.name"],
-            count: parseInt(task.count, 10),
+          tasksByStatus: tasksByStatusRaw.map((status: any) => ({
+            statusId: status.id,
+            statusName: status.name,
+            tasksCount: status.tasks.length,
           })),
-          tasksByPriority: tasksByPriority.reduce(
+          tasksByPriority: tasksByPriorityRaw.reduce(
             (acc: Record<string, number>, task: any) => {
               acc[task.priority] = parseInt(task.count, 10);
               return acc;
             },
             {}
           ),
-        },
-      };
-    });
-  } catch (error: any) {
-    return {
-      statusCode: statusCodes.SERVER_ISSUE,
-      message: error.message || "Internal server error",
-      data: null,
-    };
-  }
-};
+          overdueTasks,
+          recentTasks,
+          recentUsers,
+          monthlyTasks,
+          weeklyTasks,
+          yearlyTasks,
+          completionRate: parseFloat(completionRate.toFixed(2)),
+          tasksPerUser,
+          avgTaskDurationDays: (avgTaskDuration as any)?.avgDurationDays
+            ? parseFloat((avgTaskDuration as any)?.avgDurationDays)
+            : null,
+          statusTrends,
+          activeUsersLast30Days,
+          allIsActiveUsers,
+        };
 
-export { getDashBoardService, getDashBoardServiceForUser };
+        return {
+          statusCode: statusCodes.SUCCESS,
+          message: "Dashboard data retrieved successfully",
+          data: dashboardData,
+        };
+      });
+    } catch (err: any) {
+      console.error("Error in getDashboard:", err);
+      return {
+        statusCode: statusCodes.SERVER_ISSUE,
+        message: err.message || "Internal server error",
+        data: null,
+      };
+    }
+  }
+
+  async getDashboardForUser(userId: number) {
+    try {
+      return await withTransaction(async (transaction) => {
+        const tasks = await this.tasks.findAllForUserWithStatus(
+          userId,
+          transaction
+        );
+        const totalTasks = tasks.length;
+        const completedTasks = tasks.filter(
+          (task: any) =>
+            task.status.name === "Done" || task.status.name === "Completed"
+        ).length;
+        const completionRate =
+          totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+        const pendingTasks = tasks.filter(
+          (task: any) =>
+            task.status.name !== "Done" && task.status.name !== "Completed"
+        ).length;
+        const overdueTasks = tasks.filter(
+          (task: any) =>
+            task.end_date < new Date() &&
+            task.status.name !== "Done" &&
+            task.status.name !== "Completed"
+        ).length;
+
+        const tasksByStatus = await this.tasks.findGroupedByStatusForUser(
+          userId,
+          transaction
+        );
+        const tasksByPriority = await this.tasks.findGroupedByPriorityForUser(
+          userId,
+          transaction
+        );
+
+        return {
+          statusCode: statusCodes.SUCCESS,
+          message: "User dashboard data retrieved successfully",
+          data: {
+            totalTasks,
+            completedTasks,
+            completionRate: parseFloat(completionRate.toFixed(2)),
+            pendingTasks,
+            overdueTasks,
+            tasksByStatus: tasksByStatus.map((task: any) => ({
+              statusId: task.status_id,
+              statusName: task["status.name"],
+              count: parseInt(task.count, 10),
+            })),
+            tasksByPriority: tasksByPriority.reduce(
+              (acc: Record<string, number>, task: any) => {
+                acc[task.priority] = parseInt(task.count, 10);
+                return acc;
+              },
+              {}
+            ),
+          },
+        };
+      });
+    } catch (error: any) {
+      return {
+        statusCode: statusCodes.SERVER_ISSUE,
+        message: error.message || "Internal server error",
+        data: null,
+      };
+    }
+  }
+}
