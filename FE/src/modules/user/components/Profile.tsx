@@ -2,7 +2,7 @@ import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../../../store/store";
 import { useEffect, useState, type ChangeEvent } from "react";
 import { getUser, updateUser } from "../slices/userSlice";
-import { Mail, UserCircle, UserCog, BadgeCheck, ShieldCheck, Edit3, Save, X } from "lucide-react";
+import { Mail, UserCircle, UserCog, BadgeCheck, Edit3, Save, X } from "lucide-react";
 
 const Profile = () => {
     const dispatch = useDispatch<AppDispatch>();
