@@ -1,10 +1,14 @@
-import Joi from "joi";
 import {
   createStatusHandler,
   deleteStatusHandler,
   getAllStatusHandler,
   updateStatusHandler,
 } from "../controller/status.controller.js";
+import {
+  createStatusPayloadSchema,
+  deleteStatusPayloadSchema,
+  updateStatusPayloadSchema,
+} from "../validation/status.validation.js";
 
 const prefix = "/status";
 
@@ -16,11 +20,9 @@ export default [
     options: {
       auth: "jwt_access",
       tags: ["api", "status"],
-      description: "User signup",
+      description: "Create status",
       validate: {
-        payload: Joi.object({
-          name: Joi.string().required(),
-        }),
+        payload: createStatusPayloadSchema,
       },
       payload: {
         parse: true,
@@ -47,10 +49,7 @@ export default [
       tags: ["api", "status"],
       description: "Update status",
       validate: {
-        payload: Joi.object({
-          id: Joi.number().required(),
-          name: Joi.string().required(),
-        }),
+        payload: updateStatusPayloadSchema,
       },
       payload: {
         parse: true,
@@ -67,9 +66,7 @@ export default [
       tags: ["api", "status"],
       description: "Delete status",
       validate: {
-        payload: Joi.object({
-          id: Joi.number().required(),
-        }),
+        payload: deleteStatusPayloadSchema,
       },
       payload: {
         parse: true,

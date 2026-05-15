@@ -101,7 +101,6 @@ export const resetPasswordHandler = async (
 
 export const myHandler = async (req: Request, h: ResponseToolkit) => {
   try {
-    console.log(req.auth.credentials);
     const { userId } = req.auth.credentials as any;
     const result = await auth().me(userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)

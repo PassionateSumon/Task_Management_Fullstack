@@ -1,4 +1,5 @@
 import type { ResponseToolkit } from "@hapi/hapi";
+import { v4 as uuidv4 } from 'uuid';
 import {
   LoginPayload,
   ResetPasswordPayload,
@@ -9,11 +10,15 @@ import { CryptoUtil } from "../../../common/utils/Crypto.js";
 import { withTransaction } from "../../../common/utils/transaction.js";
 import type { UserRepository } from "../../../infrastructure/persistence/user.repository.js";
 import type { RefreshTokenRepository } from "../../../infrastructure/persistence/refresh-token.repository.js";
+import type { WorkspaceRepository } from "../../../infrastructure/persistence/workspace.repository.js";
+import type { StatusRepository } from "../../../infrastructure/persistence/status.repository.js";
 
 export class AuthService {
   constructor(
     private readonly users: UserRepository,
-    private readonly refreshTokens: RefreshTokenRepository
+    private readonly refreshTokens: RefreshTokenRepository,
+    private readonly workspaces: WorkspaceRepository,
+    private readonly statuses: StatusRepository
   ) {}
 
   async signup({
@@ -33,7 +38,7 @@ export class AuthService {
           };
         }
 
-        const username = `user_${Math.floor(Math.random() * 1000000)}`;
+        const username = `user_${uuidv4().slice(0, 8)}`;
 
         if (!user_type) {
           user_type = "admin";
@@ -41,7 +46,10 @@ export class AuthService {
 
         const hashedPassword = CryptoUtil.hashPassword(password, "10");
 
-        console.log(password, hashedPassword);
+        const workspace = await this.workspaces.create(
+          { name: `${username}'s workspace` },
+          transaction
+        );
 
         const newUser = await this.users.create(
           {
@@ -53,6 +61,7 @@ export class AuthService {
             user_type,
             is_reset_password: false,
             isOtpVerified: false,
+            workspace_id: workspace.id,
           },
           transaction
         );
@@ -65,7 +74,7 @@ export class AuthService {
           };
         }
 
-        console.log(newUser);
+        await this.statuses.seedDefaultsForWorkspace(workspace.id, transaction);
 
         return {
           statusCode: 200,

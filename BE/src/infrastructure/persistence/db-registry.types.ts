@@ -8,4 +8,5 @@ export interface DbRegistry {
   Task: any;
   Status: any;
   RefreshToken: any;
+  Workspace: any;
 }

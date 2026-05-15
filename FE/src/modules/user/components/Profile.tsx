@@ -14,7 +14,7 @@ const Profile = () => {
     });
 
     useEffect(() => {
-        dispatch(getUser({ id: null }));
+        dispatch(getUser({id: null}));
     }, [dispatch]);
 
     useEffect(() => {
@@ -30,7 +30,6 @@ const Profile = () => {
     };
 
     const handleSave = () => {
-        // console.log("Updated Profile Data:", formData);
         dispatch(updateUser(formData));
         setIsEditing(false);
     };
@@ -121,17 +120,6 @@ const Profile = () => {
                 <div className="flex items-center text-gray-700 group">
                     <BadgeCheck className="w-6 h-6 mr-4 text-indigo-500 transition-transform duration-200 group-hover:scale-110" />
                     <span className="capitalize text-gray-900">Role: {user.user_type}</span>
-                </div>
-
-                {/* OTP Verified */}
-                <div className="flex items-center text-gray-700 group">
-                    <ShieldCheck className="w-6 h-6 mr-4 text-indigo-500 transition-transform duration-200 group-hover:scale-110" />
-                    <span className="text-gray-900">
-                        OTP Verified:{" "}
-                        <span className={user.isOtpVerified ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                            {user.isOtpVerified ? "Yes" : "No"}
-                        </span>
-                    </span>
                 </div>
 
                 {/* Account Status */}

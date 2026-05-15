@@ -608,7 +608,11 @@ export const getAllTasks = createAsyncThunk(
   ) => {
     const { viewType = "compact", id = null } = payload;
     try {
-      const response = await axiosInstance.get(`/task/all/${viewType}/${id}`);
+      let url = `/task/all?viewType=${viewType}`;
+      if (id) {
+        url += `&id=${id}`;
+      }
+      const response = await axiosInstance.get(url);
       return { viewType, data: response.data };
     } catch (error: any) {
       return rejectWithValue(

@@ -1,12 +1,12 @@
-import { Request, ResponseToolkit } from "@hapi/hapi";
+import { JWTUtil } from "../../../common/utils/JWTUtils.js";
 import {
   dashBoardHandler,
   dashBoardHandlerForUser,
 } from "../controller/dashboard.controller.js";
-import Joi from "joi";
-import { JWTUtil } from "../../../common/utils/JWTUtils.js";
-
-// const prefix = "/admin";
+import {
+  dashboardQueryFailAction,
+  dashboardQuerySchema,
+} from "../validation/dashboard.validation.js";
 
 export default [
   {
@@ -18,29 +18,8 @@ export default [
       tags: ["api", "dashboard"],
       pre: [JWTUtil.verifyRole()],
       validate: {
-        query: Joi.object({
-          startDate: Joi.date()
-            .iso()
-            .optional()
-            .description(
-              "Start date for filtering dashboard data (ISO format)"
-            ),
-          endDate: Joi.date()
-            .iso()
-            .optional()
-            .greater(Joi.ref("startDate"))
-            .description("End date for filtering dashboard data (ISO format)"),
-        }),
-        failAction: (request: Request, h: ResponseToolkit, err: any) => {
-          return h
-            .response({
-              statusCode: 400,
-              message: "Validation error",
-              data: err.details,
-            })
-            .code(400)
-            .takeover();
-        },
+        query: dashboardQuerySchema,
+        failAction: dashboardQueryFailAction,
       },
     },
   },
@@ -51,18 +30,6 @@ export default [
     options: {
       auth: "jwt_access",
       tags: ["api", "dashboard"],
-      validate: {
-        failAction: (request: Request, h: ResponseToolkit, err: any) => {
-          return h
-            .response({
-              statusCode: 400,
-              message: "Validation error",
-              data: err.details,
-            })
-            .code(400)
-            .takeover();
-        },
-      },
     },
   },
 ];

@@ -1,11 +1,13 @@
 import { withTransaction } from "../../../common/utils/transaction.js";
 import type { TaskRepository } from "../../../infrastructure/persistence/task.repository.js";
+import type { UserRepository } from "../../../infrastructure/persistence/user.repository.js";
 import type { IStatusReader } from "../ports/status-reader.port.js";
 
 export class TaskService {
   constructor(
     private readonly tasks: TaskRepository,
-    private readonly statusReader: IStatusReader
+    private readonly statusReader: IStatusReader,
+    private readonly users: UserRepository
   ) {}
 
   async createTask(
@@ -40,8 +42,21 @@ export class TaskService {
       }
 
       return await withTransaction(async (transaction) => {
-        const status_id = await this.statusReader.findOneByName(
+        const workspaceId = await this.users.findWorkspaceIdByUserId(
+          userId,
+          transaction
+        );
+        if (workspaceId == null) {
+          return {
+            statusCode: 400,
+            message: "No workspace assigned to this user",
+            data: null,
+          };
+        }
+
+        const status_id = await this.statusReader.findOneByNameInWorkspace(
           status,
+          workspaceId,
           transaction
         );
         if (!status_id) {
@@ -68,7 +83,7 @@ export class TaskService {
           };
         }
 
-        const wrappedInput = {
+        const wrappedInput: Record<string, unknown> = {
           task_name: name,
           task_description: description ? description : null,
           user_id: userId,
@@ -76,6 +91,7 @@ export class TaskService {
           priority: priority ? priority : null,
           start_date: start_date ? start_date : null,
           end_date: end_date ? end_date : null,
+          completed_date: status_id.is_final ? new Date() : null,
         };
 
         const result = await this.tasks.create(wrappedInput, transaction);
@@ -110,7 +126,7 @@ export class TaskService {
     try {
       const tasks = await withTransaction(async (transaction) => {
         return this.tasks.findAllForUser(
-          reqUserId !== "null" ? reqUserId : userId,
+          reqUserId ? reqUserId : userId,
           transaction
         );
       });
@@ -119,7 +135,7 @@ export class TaskService {
 
       let result: unknown = {};
 
-      if (reqUserId === "null" || reqUserId === "undefined") {
+      if (reqUserId === null || reqUserId === undefined) {
         if (viewType === "kanban") {
           result = tasks.reduce((acc: any, task: any) => {
             const status = task.status.name;
@@ -206,8 +222,11 @@ export class TaskService {
   ) {
     try {
       return await withTransaction(async (transaction) => {
-        const task = await this.tasks.findById(id, transaction);
-        if (!task) {
+        const taskRow = await this.tasks.findByIdWithStatusJoin(
+          id,
+          transaction
+        );
+        if (!taskRow) {
           return {
             statusCode: 404,
             message: "Task not found",
@@ -216,9 +235,9 @@ export class TaskService {
         }
 
         const dateToValidateStart =
-          start_date !== undefined ? start_date : task.start_date;
+          start_date !== undefined ? start_date : taskRow.start_date;
         const dateToValidateEnd =
-          end_date !== undefined ? end_date : task.end_date;
+          end_date !== undefined ? end_date : taskRow.end_date;
 
         if (dateToValidateStart && dateToValidateEnd) {
           const startDate = new Date(dateToValidateStart);
@@ -232,10 +251,26 @@ export class TaskService {
           }
         }
 
-        let status_id = task.status_id;
-        if (status) {
-          const statusRecord = await this.statusReader.findOneByName(
+        const workspaceId = await this.users.findWorkspaceIdByUserId(
+          taskRow.user_id,
+          transaction
+        );
+        if (workspaceId == null) {
+          return {
+            statusCode: 400,
+            message: "Task owner has no workspace assigned",
+            data: null,
+          };
+        }
+
+        const oldStatus = taskRow.status;
+        let status_id = taskRow.status_id;
+        let newStatusRow = oldStatus;
+
+        if (status !== undefined) {
+          const statusRecord = await this.statusReader.findOneByNameInWorkspace(
             status,
+            workspaceId,
             transaction
           );
           if (!statusRecord) {
@@ -246,16 +281,28 @@ export class TaskService {
             };
           }
           status_id = statusRecord.id;
+          newStatusRow = statusRecord;
         }
 
-        const updatedData = {
-          task_name: name ? name : task.task_name,
-          task_description: description ? description : task.task_description,
+        let completed_date: Date | null = taskRow.completed_date;
+        if (status !== undefined && newStatusRow) {
+          if (newStatusRow.is_final) {
+            completed_date = new Date();
+          } else if (oldStatus?.is_final && !newStatusRow.is_final) {
+            completed_date = null;
+          }
+        }
+
+        const updatedData: Record<string, unknown> = {
+          task_name: name ? name : taskRow.task_name,
+          task_description: description ? description : taskRow.task_description,
           status_id: status_id,
-          priority: priority !== undefined ? priority : task.priority,
-          start_date: start_date !== undefined ? start_date : task.start_date,
-          end_date: end_date !== undefined ? end_date : task.end_date,
+          priority: priority !== undefined ? priority : taskRow.priority,
+          start_date: start_date !== undefined ? start_date : taskRow.start_date,
+          end_date: end_date !== undefined ? end_date : taskRow.end_date,
+          completed_date,
         };
+
         await this.tasks.updateById(id, updatedData, transaction);
         const finalRes = await this.tasks.findOneWithStatusAlias(
           id,

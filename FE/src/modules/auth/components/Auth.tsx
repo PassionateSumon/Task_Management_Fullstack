@@ -11,7 +11,7 @@ import { login, signup, clearError } from "../slices/AuthSlice";
 import type { AppDispatch, RootState } from "../../../store/store";
 import type { AuthProps, FormData } from "../types/Auth.interface";
 import { toast } from "react-toastify";
-// import { Hash } from "../../../common/utils/Hash";
+import { getStrictPasswordError } from "../../../common/validation/password";
 
 const isEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -29,6 +29,10 @@ const getFieldError = (
       if (!isEmail(value)) return "Invalid email format.";
     }
     if (field === "password" && !value) return "Password is required.";
+    if (field === "password" && value) {
+      const err = getStrictPasswordError(value);
+      if (err && err !== "Password is required.") return err;
+    }
   } else {
     if (field === "emailOrUsername") {
       if (!value) return "Email or Username is required.";
@@ -103,7 +107,6 @@ const Auth: FC<AuthProps> = ({ from }) => {
     if (Object.values(newErrors).some((err) => err)) return;
 
     // const hashedPassword = await Hash.hashPassword(formData.password);
-    // console.log(formData)
 
     const action = from === "signup"
       ? signup({

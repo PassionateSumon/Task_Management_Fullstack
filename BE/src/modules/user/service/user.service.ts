@@ -30,9 +30,9 @@ export class UserService {
     }
   }
 
-  async getSingleUser(id: number | string, userId: number) {
+  async getSingleUser(id: number | null, userId: number) {
     try {
-      const currId = id === "null" ? userId : id;
+      const currId = !id ? userId : id;
       const user = await withTransaction(async (transaction) => {
         return this.users.findOneByIdExcludePassword(currId, transaction);
       });

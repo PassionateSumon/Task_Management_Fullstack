@@ -139,22 +139,25 @@ export class DashboardService {
           userId,
           transaction
         );
+        const isDoneLike = (s: any) =>
+          Boolean(s?.is_final) ||
+          s?.name === "Done" ||
+          s?.name === "Completed";
+
         const totalTasks = tasks.length;
-        const completedTasks = tasks.filter(
-          (task: any) =>
-            task.status.name === "Done" || task.status.name === "Completed"
+        const completedTasks = tasks.filter((task: any) =>
+          isDoneLike(task.status)
         ).length;
         const completionRate =
           totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
         const pendingTasks = tasks.filter(
-          (task: any) =>
-            task.status.name !== "Done" && task.status.name !== "Completed"
+          (task: any) => !isDoneLike(task.status)
         ).length;
         const overdueTasks = tasks.filter(
           (task: any) =>
-            task.end_date < new Date() &&
-            task.status.name !== "Done" &&
-            task.status.name !== "Completed"
+            task.end_date &&
+            new Date(task.end_date) < new Date() &&
+            !isDoneLike(task.status)
         ).length;
 
         const tasksByStatus = await this.tasks.findGroupedByStatusForUser(

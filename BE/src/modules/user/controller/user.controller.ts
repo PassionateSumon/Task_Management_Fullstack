@@ -21,7 +21,7 @@ export const getSingleUserHandler = async (
   h: ResponseToolkit
 ) => {
   try {
-    const id = req.params.id as number;
+    const id = req.query.id;
     const { userId } = req.auth.credentials as any;
     const result = await users().getSingleUser(id, userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)

@@ -1,4 +1,3 @@
-import Joi from "joi";
 import {
   createTaskHandler,
   deleteTaskHandler,
@@ -6,7 +5,13 @@ import {
   getSingleTaskHandler,
   updateTaskHandler,
 } from "../controller/task.controller.js";
-import { Request, ResponseToolkit } from "@hapi/hapi";
+import {
+  createTaskPayloadSchema,
+  updateTaskFailAction,
+  updateTaskPayloadSchema,
+  taskIdParamSchema,
+  taskGetAllParamSchema,
+} from "../validation/task.validation.js";
 
 const prefix = "/task";
 
@@ -20,14 +25,7 @@ export default [
       tags: ["api", "task"],
       description: "Create task",
       validate: {
-        payload: Joi.object({
-          name: Joi.string().required(),
-          description: Joi.string().optional(),
-          status: Joi.string().required(),
-          priority: Joi.string().optional(),
-          start_date: Joi.string().optional(),
-          end_date: Joi.string().optional(),
-        }),
+        payload: createTaskPayloadSchema,
       },
       payload: {
         parse: true,
@@ -37,12 +35,15 @@ export default [
   },
   {
     method: "GET",
-    path: `${prefix}/all/{viewType}/{id}`,
+    path: `${prefix}/all`,
     handler: getAllTaskHandler,
     options: {
       auth: "jwt_access",
       tags: ["api", "task"],
       description: "Get all task",
+      validate: {
+        query: taskGetAllParamSchema,
+      },
     },
   },
   {
@@ -53,6 +54,9 @@ export default [
       auth: "jwt_access",
       tags: ["api", "task"],
       description: "Get single task",
+      validate: {
+        params: taskIdParamSchema,
+      },
     },
   },
   {
@@ -64,24 +68,9 @@ export default [
       tags: ["api", "task"],
       description: "Update task",
       validate: {
-        payload: Joi.object({
-          name: Joi.string().optional(),
-          description: Joi.string().optional(),
-          status: Joi.string().optional(),
-          priority: Joi.string().optional(),
-          start_date: Joi.date().optional(),
-          end_date: Joi.date().optional(),
-        }).or(
-          "name",
-          "description",
-          "status",
-          "priority",
-          "start_date",
-          "end_date"
-        ),
-        failAction: (req: Request, h: ResponseToolkit, err: any) => {
-          return h.response({ error: err.message }).code(400).takeover();
-        },
+        params: taskIdParamSchema,
+        payload: updateTaskPayloadSchema,
+        failAction: updateTaskFailAction,
       },
       payload: {
         parse: true,
@@ -97,6 +86,9 @@ export default [
       auth: "jwt_access",
       tags: ["api", "task"],
       description: "Delete task",
+      validate: {
+        params: taskIdParamSchema,
+      },
     },
   },
 ];

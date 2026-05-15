@@ -48,10 +48,15 @@ export class TaskRepository implements ITaskWriter {
         "priority",
         "start_date",
         "end_date",
+        "completed_date",
         "user_id",
       ],
       include: [
-        { model: this.db.Status, as: "status", attributes: ["id", "name"] },
+        {
+          model: this.db.Status,
+          as: "status",
+          attributes: ["id", "name", "is_final", "is_system"],
+        },
       ],
       transaction,
     });
@@ -60,7 +65,27 @@ export class TaskRepository implements ITaskWriter {
   async findOneWithStatus(id: number, transaction?: Transaction) {
     return this.db.Task.findOne({
       where: { id },
-      include: [{ model: this.db.Status, attributes: ["id", "name"] }],
+      include: [
+        {
+          model: this.db.Status,
+          as: "status",
+          attributes: ["id", "name", "is_final", "is_system", "workspace_id"],
+        },
+      ],
+      transaction,
+    });
+  }
+
+  async findByIdWithStatusJoin(id: number, transaction?: Transaction) {
+    return this.db.Task.findOne({
+      where: { id },
+      include: [
+        {
+          model: this.db.Status,
+          as: "status",
+          attributes: ["id", "name", "is_final", "is_system", "workspace_id"],
+        },
+      ],
       transaction,
     });
   }
@@ -81,7 +106,11 @@ export class TaskRepository implements ITaskWriter {
     return this.db.Task.findOne({
       where: { id },
       include: [
-        { model: this.db.Status, as: "status", attributes: ["id", "name"] },
+        {
+          model: this.db.Status,
+          as: "status",
+          attributes: ["id", "name", "is_final", "is_system", "workspace_id"],
+        },
       ],
       transaction,
     });
@@ -89,6 +118,16 @@ export class TaskRepository implements ITaskWriter {
 
   async destroyById(id: number, transaction?: Transaction) {
     return this.db.Task.destroy({ where: { id }, transaction });
+  }
+
+  async nullCompletedDateForTasksInStatus(
+    statusId: number,
+    transaction?: Transaction
+  ): Promise<void> {
+    await this.db.Task.update(
+      { completed_date: null },
+      { where: { status_id: statusId }, transaction }
+    );
   }
 
   /** Dashboard aggregate helpers — same queries as legacy dashboard.service */
@@ -102,7 +141,12 @@ export class TaskRepository implements ITaskWriter {
         {
           model: this.db.Status,
           as: "status",
-          where: { name: { [Op.in]: ["Done", "Completed"] } },
+          where: {
+            [Op.or]: [
+              { name: { [Op.in]: ["Done", "Completed"] } },
+              { is_final: true },
+            ],
+          },
         },
       ],
       transaction,
@@ -117,7 +161,12 @@ export class TaskRepository implements ITaskWriter {
           model: this.db.Status,
           as: "status",
           where: {
-            name: { [Op.notIn]: ["Done", "Completed"] },
+            [Op.not]: {
+              [Op.or]: [
+                { name: { [Op.in]: ["Done", "Completed"] } },
+                { is_final: true },
+              ],
+            },
           },
         },
       ],
@@ -298,7 +347,12 @@ export class TaskRepository implements ITaskWriter {
         {
           model: this.db.Status,
           as: "status",
-          where: { name: { [Op.in]: ["Done", "Completed"] } },
+          where: {
+            [Op.or]: [
+              { name: { [Op.in]: ["Done", "Completed"] } },
+              { is_final: true },
+            ],
+          },
           attributes: [],
         },
       ],
@@ -323,7 +377,12 @@ export class TaskRepository implements ITaskWriter {
         {
           model: this.db.Status,
           as: "status",
-          where: { name: { [Op.in]: ["Done", "Completed"] } },
+          where: {
+            [Op.or]: [
+              { name: { [Op.in]: ["Done", "Completed"] } },
+              { is_final: true },
+            ],
+          },
           attributes: [],
         },
       ],

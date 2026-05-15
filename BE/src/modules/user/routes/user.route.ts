@@ -1,4 +1,3 @@
-import Joi from "joi";
 import {
   deleteUserHandler,
   getAllUsersHandler,
@@ -7,6 +6,10 @@ import {
   updateDetailsHandler,
 } from "../controller/user.controller.js";
 import { JWTUtil } from "../../../common/utils/JWTUtils.js";
+import {
+  userUpdateNamePayloadSchema,
+  userIdParamSchema,
+} from "../validation/user.validation.js";
 
 const prefix = "/user";
 export default [
@@ -22,12 +25,15 @@ export default [
   },
   {
     method: "GET",
-    path: `${prefix}/single/{id}`,
+    path: `${prefix}/single`,
     handler: getSingleUserHandler,
     options: {
       auth: "jwt_access",
       tags: ["api", "user"],
       description: "Get single user",
+      validate: {
+        query: userIdParamSchema,
+      },
     },
   },
   {
@@ -39,9 +45,7 @@ export default [
       tags: ["api", "user"],
       description: "Update details of user",
       validate: {
-        payload: Joi.object({
-          name: Joi.string().required(),
-        })
+        payload: userUpdateNamePayloadSchema,
       },
       payload: {
         parse: true,
@@ -58,6 +62,9 @@ export default [
       pre: [JWTUtil.verifyRole()],
       tags: ["api", "user"],
       description: "Toggle active of user",
+      validate: {
+        params: userIdParamSchema,
+      },
       payload: {
         parse: true,
         output: "data",
@@ -72,6 +79,9 @@ export default [
       auth: "jwt_access",
       tags: ["api", "user"],
       description: "Delete user",
+      validate: {
+        params: userIdParamSchema,
+      },
     },
   },
 ];

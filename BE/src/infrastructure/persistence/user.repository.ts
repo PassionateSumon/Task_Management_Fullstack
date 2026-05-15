@@ -5,6 +5,17 @@ import type { DbRegistry } from "./db-registry.types.js";
 export class UserRepository {
   constructor(private readonly db: DbRegistry) {}
 
+  async findWorkspaceIdByUserId(
+    userId: string | number,
+    transaction?: Transaction
+  ): Promise<number | null> {
+    const u = await this.db.User.findByPk(userId, {
+      attributes: ["workspace_id"],
+      transaction,
+    });
+    return u?.workspace_id ?? null;
+  }
+
   async findByPk(
     id: string | number,
     transaction?: Transaction

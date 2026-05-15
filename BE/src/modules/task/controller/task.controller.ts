@@ -27,8 +27,8 @@ export const createTaskHandler = async (req: Request, h: ResponseToolkit) => {
 export const getAllTaskHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const { userId, roleId } = req.auth.credentials as any;
-    const reqUserId = req.params.id as string | null;
-    const viewType = req.params.viewType as "kanban" | "compact" | "calendar";
+    const viewType = req.query.viewType as "kanban" | "compact" | "calendar" | "table";
+    const reqUserId = req.query.id as string | null;
     const result = await task().getAllTasks(viewType, userId, roleId, reqUserId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);

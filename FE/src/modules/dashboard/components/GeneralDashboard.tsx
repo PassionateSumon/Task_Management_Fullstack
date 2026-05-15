@@ -35,7 +35,6 @@ const GeneralDashboard = () => {
         speedMultiplier={1}
       />
     );
-  // console.log(data);
   return (
     <div className="bg-[#F3F4FE] h-[94vh] overflow-y-auto p-6 text-[#2D3748] thin-scrollbar ">
       <h1 className="text-2xl font-bold mb-6">Personal Dashboard</h1>
