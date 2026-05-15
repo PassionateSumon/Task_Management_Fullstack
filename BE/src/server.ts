@@ -31,7 +31,10 @@ const ORIGIN =
     ? process.env.PROD_ORIGIN
     : process.env.DEV_ORIGIN) ?? "http://localhost:3000";
 
-console.log("origin: ", ORIGIN);
+const baseUrl =
+  process.env.NODE_ENV === "production"
+    ? process.env.PROD_ORIGIN
+    : `http://localhost:${process.env.PORT}`;
 
 const init = async () => {
   const server = Hapi.server({
@@ -115,7 +118,7 @@ const init = async () => {
     await server.start();
     console.log(`Server is running on ${server.info.uri}`);
     console.log(
-      `Swagger is running on http://localhost:${process.env.PORT}/documentation`
+      `Swagger is running on ${baseUrl}/documentation`
     );
   } catch (error) {
     console.error("Unable to connect to the database or start server:", error);
