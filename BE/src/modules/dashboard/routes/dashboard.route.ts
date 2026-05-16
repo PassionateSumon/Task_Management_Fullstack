@@ -16,6 +16,11 @@ export default [
     options: {
       auth: "jwt_access",
       tags: ["api", "dashboard"],
+      plugins: {
+        "hapi-swagger": {
+          security: [{ cookieAuth: [] }],
+        },
+      },
       pre: [JWTUtil.verifyRole()],
       validate: {
         query: dashboardQuerySchema,
@@ -30,6 +35,11 @@ export default [
     options: {
       auth: "jwt_access",
       tags: ["api", "dashboard"],
+      plugins: {
+        "hapi-swagger": {
+          security: [{ cookieAuth: [] }],
+        },
+      },
     },
   },
 ];

@@ -21,6 +21,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "user"],
       description: "Get all users",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
     },
   },
   {
@@ -31,6 +32,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "user"],
       description: "Get single user",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         query: userIdParamSchema,
       },
@@ -44,6 +46,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "user"],
       description: "Update details of user",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         payload: userUpdateNamePayloadSchema,
       },
@@ -62,6 +65,7 @@ export default [
       pre: [JWTUtil.verifyRole()],
       tags: ["api", "user"],
       description: "Toggle active of user",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         params: userIdParamSchema,
       },
@@ -79,6 +83,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "user"],
       description: "Delete user",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         params: userIdParamSchema,
       },

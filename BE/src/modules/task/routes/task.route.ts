@@ -24,6 +24,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "task"],
       description: "Create task",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         payload: createTaskPayloadSchema,
       },
@@ -41,6 +42,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "task"],
       description: "Get all task",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         query: taskGetAllParamSchema,
       },
@@ -54,6 +56,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "task"],
       description: "Get single task",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         params: taskIdParamSchema,
       },
@@ -67,6 +70,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "task"],
       description: "Update task",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         params: taskIdParamSchema,
         payload: updateTaskPayloadSchema,
@@ -86,6 +90,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "task"],
       description: "Delete task",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         params: taskIdParamSchema,
       },

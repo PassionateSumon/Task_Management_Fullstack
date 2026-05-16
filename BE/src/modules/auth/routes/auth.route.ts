@@ -128,6 +128,11 @@ export default [
       auth: "jwt_access",
       tags: ["api", "auth"],
       description: "Get user details",
+      plugins: {
+        "hapi-swagger": {
+          security: [{ cookieAuth: [] }],
+        },
+      },
     },
   },
   {
@@ -138,6 +143,11 @@ export default [
       auth: "jwt_access",
       tags: ["api", "auth"],
       description: "User logout",
+      plugins: {
+        "hapi-swagger": {
+          security: [{ cookieAuth: [] }],
+        },
+      },
     },
   },
 ];

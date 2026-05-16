@@ -67,6 +67,40 @@ const init = async () => {
 
   await server.register(Jwt);
   await server.register(Cookie);
+
+  const SWAGGER_PATHS = ['/documentation', '/swagger.json', '/swaggerui/'];
+  server.ext('onRequest', (request, h) => {
+    const path = request.path;
+    const isSwaggerRequest = SWAGGER_PATHS.some((p) => path === p || path.startsWith(p));
+    
+    if (!isSwaggerRequest) return h.continue;
+
+    const swaggerUser = process.env.SWAGGER_USER;
+    const swaggerPass = process.env.SWAGGER_PASS;
+
+    if (!swaggerUser || !swaggerPass) return h.continue;
+
+    const authorization = request.headers.authorization;
+    if (!authorization || !authorization.startsWith('Basic ')) {
+      return h.response('Authentication required')
+        .code(401)
+        .header('WWW-Authenticate', 'Basic realm="API Documentation"')
+        .takeover();
+    }
+
+    const base64Credentials = authorization.split(' ')[1];
+    const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
+    const [user, pass] = credentials.split(':');
+
+    if (user !== swaggerUser || pass !== swaggerPass) {
+      return h.response('Invalid credentials')
+        .code(401)
+        .header('WWW-Authenticate', 'Basic realm="API Documentation"')
+        .takeover();
+    }
+    return h.continue;
+  });
+
   await registerSwagger(server);
 
   const container = getAppContainer();

@@ -21,6 +21,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "status"],
       description: "Create status",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         payload: createStatusPayloadSchema,
       },
@@ -38,6 +39,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "status"],
       description: "Get all status",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
     },
   },
   {
@@ -48,6 +50,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "status"],
       description: "Update status",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         payload: updateStatusPayloadSchema,
       },
@@ -65,6 +68,7 @@ export default [
       auth: "jwt_access",
       tags: ["api", "status"],
       description: "Delete status",
+      plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
       validate: {
         payload: deleteStatusPayloadSchema,
       },
