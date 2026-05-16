@@ -9,12 +9,14 @@ const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES || "30d";
 
 export class JWTUtil {
-  static generateAccessToken = (userId: string, roleId: string) => {
+  static generateAccessToken = (userId: number, roleId: string) => {
     if (!ACCESS_SECRET) throw new Error("Access secret key not found!");
+    // console.log(userId, roleId);
     try {
       const token = (jwt as any).sign({ userId, roleId }, ACCESS_SECRET, {
         expiresIn: ACCESS_EXPIRES,
       });
+       // console.log("JWT --> ",token)
       return token;
     } catch (error) {
       console.error("Error in jwt.sign:", error);
@@ -22,7 +24,7 @@ export class JWTUtil {
     }
   };
 
-  static generateRefreshToken = (userId: string, roleId: string) => {
+  static generateRefreshToken = (userId: number, roleId: string) => {
     if (!REFRESH_SECRET) throw new Error("Access secret key not found!");
     try {
       return (jwt as any).sign({ userId, roleId }, REFRESH_SECRET, {
@@ -43,8 +45,10 @@ export class JWTUtil {
 
   static verifyRole = () => {
     return async (request: Request, h: ResponseToolkit) => {
+      // console.log(request.auth.credentials);
       const { roleId: roleName } = request.auth.credentials as any;
       if (!roleName) throw new Error("Role not found");
+      // console.log("Role Name ", roleName);
       if (roleName !== "admin") throw new Error("Forbidden");
       return h.continue;
     };

@@ -373,7 +373,7 @@ export class AuthService {
     }
   }
 
-  async me(userId: string) {
+  async me(userId: number) {
     try {
       return await withTransaction(async (transaction) => {
         const user = await this.users.findByPk(userId, transaction);
@@ -411,7 +411,7 @@ export class AuthService {
     }
   }
 
-  async logout(userId: string, h: ResponseToolkit) {
+  async logout(userId: number, h: ResponseToolkit) {
     try {
       const result = await withTransaction(async (transaction) => {
         const user = await this.users.findByPk(userId, transaction);

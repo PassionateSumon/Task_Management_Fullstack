@@ -1,6 +1,6 @@
 export const statusCodes = {
   NOT_FOUND: 404,
-  CNFLICT: 409,
+  CONFLICT: 409,
   BAD_REQUEST: 400,
   SERVER_ISSUE: 500,
   PERMISSION_DENIED: 403,

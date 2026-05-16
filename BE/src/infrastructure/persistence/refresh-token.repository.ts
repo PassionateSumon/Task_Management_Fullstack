@@ -30,7 +30,7 @@ export class RefreshTokenRepository {
     );
   }
 
-  async destroyByUserId(userId: string, transaction?: Transaction) {
+  async destroyByUserId(userId: number, transaction?: Transaction) {
     return this.db.RefreshToken.destroy({
       where: { userId },
       transaction,
@@ -39,7 +39,7 @@ export class RefreshTokenRepository {
 
   async findOneByTokenAndUserId(
     token: string,
-    userId: string,
+    userId: number,
     transaction?: Transaction
   ) {
     return this.db.RefreshToken.findOne({

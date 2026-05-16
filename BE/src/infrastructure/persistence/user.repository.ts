@@ -7,7 +7,7 @@ export class UserRepository {
   constructor(private readonly db: DbRegistry) {}
 
   async findWorkspaceIdByUserId(
-    userId: string | number,
+    userId: number,
     transaction?: Transaction
   ): Promise<number | null> {
     const u = await this.db.User.findByPk(userId, {
@@ -101,7 +101,7 @@ export class UserRepository {
       where: {
         isActive: true,
         user_type: USER_TYPE.USER,
-        workspace_id: workspaceId || null,
+        workspace_id: workspaceId ?? null,
       },
       transaction,
     });
@@ -115,7 +115,7 @@ export class UserRepository {
       attributes: { exclude: ["password", "otp"] },
       where: {
         user_type: USER_TYPE.USER,
-        workspace_id: workspaceId || null,
+        workspace_id: workspaceId ?? null,
       },
       order: [["createdAt", "DESC"]],
       limit: 5,
@@ -132,7 +132,7 @@ export class UserRepository {
     return this.db.User.count({
       where: {
         user_type: USER_TYPE.USER,
-        workspace_id: workspaceId || null,
+        workspace_id: workspaceId ?? null,
       },
       include: [
         {
@@ -168,7 +168,7 @@ export class UserRepository {
     return this.db.User.findAll({
       where: {
         user_type: USER_TYPE.USER,
-        workspace_id: workspaceId || null,
+        workspace_id: workspaceId ?? null,
       },
       attributes: ["id", "name", "email", "isActive"],
       transaction,

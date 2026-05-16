@@ -8,7 +8,7 @@ import type { RefreshTokenRepository } from "../persistence/refresh-token.reposi
 
 const verifyToken = (token: string, secret: string) => {
   try {
-    return jwt.verify(token, secret) as { userId: string; iat?: number };
+    return jwt.verify(token, secret) as { userId: number; iat?: number };
   } catch {
     throw new ApiError("Invalid or expired token", 401);
   }
@@ -79,13 +79,10 @@ export class CookieAuthValidators {
 
       const decoded = verifyToken(token, refreshSecret) as any;
 
-      const refreshToken = await withTransaction(async (transaction) => {
-        return await this.refreshTokens.findOneByTokenAndUserId(
-          token,
-          decoded.userId,
-          transaction
-        );
-      });
+      const refreshToken = await this.refreshTokens.findOneByTokenAndUserId(
+        token,
+        decoded.userId
+      );
       if (!refreshToken || refreshToken.expiresAt < new Date()) {
         throw new ApiError(
           "Invalid or expired refresh token!",
@@ -93,9 +90,7 @@ export class CookieAuthValidators {
         );
       }
 
-      const user = await withTransaction(async (transaction) => {
-        return await this.users.findOneById(decoded.userId, transaction);
-      });
+      const user = await this.users.findOneById(decoded.userId);
       if (!user || !user.isActive) {
         throw new ApiError(
           "User not found or inactive!",

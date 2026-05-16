@@ -17,7 +17,7 @@ export class StatusService {
   ) {}
 
   private async requireWorkspaceId(
-    userId: string,
+    userId: number,
     transaction?: import("sequelize").Transaction
   ) {
     const wid = await this.users.findWorkspaceIdByUserId(userId, transaction);
@@ -34,7 +34,7 @@ export class StatusService {
   }
 
   async createStatus(
-    userId: string,
+    userId: number,
     params: { name: string; is_final?: boolean }
   ): Promise<StatusOpResult> {
     const { name, is_final = false } = params;
@@ -105,7 +105,7 @@ export class StatusService {
     }
   }
 
-  async getAllStatuses(userId: string): Promise<StatusOpResult> {
+  async getAllStatuses(userId: number): Promise<StatusOpResult> {
     try {
       return (await withTransaction(async (transaction) => {
         const ws = await this.requireWorkspaceId(userId, transaction);
@@ -131,7 +131,7 @@ export class StatusService {
   }
 
   async updateStatus(
-    userId: string,
+    userId: number,
     params: { id: number; name: string; is_final?: boolean }
   ): Promise<StatusOpResult> {
     const { id, name, is_final } = params;
@@ -230,7 +230,7 @@ export class StatusService {
     }
   }
 
-  async deleteStatus(userId: string, params: { id: number; new_final_id?: number }): Promise<StatusOpResult> {
+  async deleteStatus(userId: number, params: { id: number; new_final_id?: number }): Promise<StatusOpResult> {
     const { id, new_final_id } = params;
     try {
       return (await withTransaction(async (transaction) => {
