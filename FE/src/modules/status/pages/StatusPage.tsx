@@ -55,7 +55,7 @@ const StatusPage = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight">Statuses</h1>
+            <h1 className="text-xl font-bold text-gray-800 tracking-tight">Status</h1>
             <p className="text-gray-400 text-xs mt-0.5">
               Scoped to your workspace. Built-in statuses cannot be deleted.
             </p>
@@ -97,7 +97,7 @@ const StatusPage = () => {
           </div>
 
           {/* Rows */}
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-gray-50 cursor-pointer">
             {filteredStatuses?.length > 0 ? (
               filteredStatuses.map((status) => {
                 const colors = getStatusColor(status.name);
