@@ -6,7 +6,8 @@ const dashboard = () => getAppContainer().dashboardService;
 
 export const dashBoardHandler = async (req: Request, h: ResponseToolkit) => {
   try {
-    const res = await dashboard().getDashboard();
+    const { userId } = req.auth.credentials as any;
+    const res = await dashboard().getDashboard(userId);
     if (res.statusCode !== 200) {
       return error(null, res.message, res.statusCode)(h);
     }

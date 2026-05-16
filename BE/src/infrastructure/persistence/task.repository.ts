@@ -2,6 +2,7 @@ import { Op } from "sequelize";
 import type { Transaction } from "sequelize";
 import type { DbRegistry } from "./db-registry.types.js";
 import type { ITaskWriter } from "../../modules/status/ports/task-writer.port.js";
+import { USER_TYPE } from "../../common/constants/constants.js";
 
 export class TaskRepository implements ITaskWriter {
   constructor(private readonly db: DbRegistry) {}
@@ -130,12 +131,24 @@ export class TaskRepository implements ITaskWriter {
     );
   }
 
-  /** Dashboard aggregate helpers — same queries as legacy dashboard.service */
-  async countAll(transaction?: Transaction) {
-    return this.db.Task.count({ transaction });
+  /** Dashboard aggregate helpers */
+  async countAll(workspaceId: number | null, transaction?: Transaction) {
+    return this.db.Task.count({
+      include: [
+        {
+          model: this.db.User,
+          as: "user",
+          where: {
+            workspace_id: workspaceId,
+          },
+          attributes: [],
+        },
+      ],
+      transaction
+    });
   }
 
-  async countCompleted(transaction?: Transaction) {
+  async countCompleted(workspaceId: number | null, transaction?: Transaction) {
     return this.db.Task.count({
       include: [
         {
@@ -148,12 +161,20 @@ export class TaskRepository implements ITaskWriter {
             ],
           },
         },
+        {
+          model: this.db.User,
+          as: "user",
+          where: {
+            workspace_id: workspaceId,
+          },
+          attributes: [],
+        },
       ],
       transaction,
     });
   }
 
-  async countOverdue(currentDate: Date, transaction?: Transaction) {
+  async countOverdue(currentDate: Date, workspaceId: number | null, transaction?: Transaction) {
     return this.db.Task.count({
       where: { end_date: { [Op.lt]: currentDate } },
       include: [
@@ -169,12 +190,20 @@ export class TaskRepository implements ITaskWriter {
             },
           },
         },
+        {
+          model: this.db.User,
+          as: "user",
+          where: {
+            workspace_id: workspaceId,
+          },
+          attributes: [],
+        },
       ],
       transaction,
     });
   }
 
-  async findRecentWithUserAndStatus(transaction?: Transaction) {
+  async findRecentWithUserAndStatus(workspaceId: number | null, transaction?: Transaction) {
     return this.db.Task.findAll({
       attributes: [
         "id",
@@ -191,10 +220,17 @@ export class TaskRepository implements ITaskWriter {
           model: this.db.User,
           as: "user",
           attributes: ["id", "name", "email", "username"],
+          where: {
+            workspace_id: workspaceId,
+          },
         },
-        { model: this.db.Status, as: "status", attributes: ["id", "name"] },
+        {
+          model: this.db.Status,
+          as: "status",
+          attributes: ["id", "name"]
+        },
       ],
-      order: [["createdAt", "DESC"]],
+      order: [[this.db.sequelize.literal("`Task`.`createdAt`"), "DESC"]],
       limit: 5,
       raw: true,
       nest: true,
@@ -202,10 +238,20 @@ export class TaskRepository implements ITaskWriter {
     });
   }
 
-  async findGroupedByPriority(transaction?: Transaction) {
+  async findGroupedByPriority(workspaceId: number | null, transaction?: Transaction) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
       attributes: ["priority", [sequelize.literal("COUNT(*)"), "count"]],
+      include: [
+        {
+          model: this.db.User,
+          as: "user",
+          where: {
+            workspace_id: workspaceId,
+          },
+          attributes: [],
+        },
+      ],
       group: "priority",
       raw: true,
       transaction,
@@ -214,13 +260,14 @@ export class TaskRepository implements ITaskWriter {
 
   async findMonthlyTasks(
     currentYear: number,
+    workspaceId: number | null,
     transaction?: Transaction
   ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
       attributes: [
         [
-          sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m"),
+          sequelize.fn("DATE_FORMAT", sequelize.col("Task.createdAt"), "%Y-%m"),
           "month",
         ],
         [sequelize.literal("COUNT(*)"), "count"],
@@ -239,7 +286,17 @@ export class TaskRepository implements ITaskWriter {
           ),
         },
       },
-      group: [sequelize.fn("DATE_FORMAT", sequelize.col("createdAt"), "%Y-%m")],
+      include: [
+        {
+          model: this.db.User,
+          as: "user",
+          where: {
+            workspace_id: workspaceId,
+          },
+          attributes: [],
+        },
+      ],
+      group: [sequelize.fn("DATE_FORMAT", sequelize.col("Task.createdAt"), "%Y-%m")],
       raw: true,
       transaction,
     });
@@ -248,14 +305,15 @@ export class TaskRepository implements ITaskWriter {
   async findWeeklyTasks(
     currentYear: number,
     currentMonth: number,
+    workspaceId: number | null,
     transaction?: Transaction
   ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
       attributes: [
-        [sequelize.fn("YEAR", sequelize.col("createdAt")), "year"],
-        [sequelize.fn("WEEK", sequelize.col("createdAt"), 1), "week"],
-        [sequelize.fn("COUNT", sequelize.col("id")), "count"],
+        [sequelize.fn("YEAR", sequelize.col("Task.createdAt")), "year"],
+        [sequelize.fn("WEEK", sequelize.col("Task.createdAt"), 1), "week"],
+        [sequelize.fn("COUNT", sequelize.col("Task.id")), "count"],
       ],
       where: {
         createdAt: {
@@ -271,36 +329,56 @@ export class TaskRepository implements ITaskWriter {
           ),
         },
       },
+      include: [
+        {
+          model: this.db.User,
+          as: "user",
+          where: {
+            workspace_id: workspaceId,
+          },
+          attributes: [],
+        },
+      ],
       group: [
-        sequelize.fn("YEAR", sequelize.col("createdAt")),
-        sequelize.fn("WEEK", sequelize.col("createdAt"), 1),
+        sequelize.fn("YEAR", sequelize.col("Task.createdAt")),
+        sequelize.fn("WEEK", sequelize.col("Task.createdAt"), 1),
       ],
       order: [
-        [sequelize.fn("YEAR", sequelize.col("createdAt")), "ASC"],
-        [sequelize.fn("WEEK", sequelize.col("createdAt"), 1), "ASC"],
+        [sequelize.fn("YEAR", sequelize.col("Task.createdAt")), "ASC"],
+        [sequelize.fn("WEEK", sequelize.col("Task.createdAt"), 1), "ASC"],
       ],
       raw: true,
       transaction,
     });
   }
 
-  async findYearlyByStartDate(transaction?: Transaction) {
+  async findYearlyByStartDate(workspaceId: number | null, transaction?: Transaction) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
       attributes: [
-        [sequelize.fn("YEAR", sequelize.col("start_date")), "year"],
-        [sequelize.fn("COUNT", sequelize.col("id")), "count"],
+        [sequelize.fn("YEAR", sequelize.col("Task.start_date")), "year"],
+        [sequelize.fn("COUNT", sequelize.col("Task.id")), "count"],
       ],
       where: {
         start_date: { [Op.ne]: null },
       },
-      group: [sequelize.fn("YEAR", sequelize.col("start_date"))],
+      include: [
+        {
+          model: this.db.User,
+          as: "user",
+          where: {
+            workspace_id: workspaceId,
+          },
+          attributes: [],
+        },
+      ],
+      group: [sequelize.fn("YEAR", sequelize.col("Task.start_date"))],
       raw: true,
       transaction,
     });
   }
 
-  async findTasksPerUser(transaction?: Transaction) {
+  async findTasksPerUser(workspaceId: number | null, transaction?: Transaction) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
       attributes: [
@@ -313,7 +391,10 @@ export class TaskRepository implements ITaskWriter {
           model: this.db.User,
           as: "user",
           attributes: [],
-          where: { user_type: "user" },
+          where: {
+            user_type: USER_TYPE.USER,
+            workspace_id: workspaceId,
+          },
         },
       ],
       group: ["user.id", "user.name"],
@@ -322,7 +403,7 @@ export class TaskRepository implements ITaskWriter {
     });
   }
 
-  async findAvgDurationCompleted(transaction?: Transaction) {
+  async findAvgDurationCompleted(workspaceId: number | null, transaction?: Transaction) {
     const { sequelize } = this.db;
     return this.db.Task.findOne({
       attributes: [
@@ -355,13 +436,21 @@ export class TaskRepository implements ITaskWriter {
           },
           attributes: [],
         },
+        {
+          model: this.db.User,
+          as: "user",
+          where: {
+            workspace_id: workspaceId,
+          },
+          attributes: [],
+        },
       ],
       raw: true,
       transaction,
     });
   }
 
-  async findStatusTrends(thirtyDaysAgo: Date, transaction?: Transaction) {
+  async findStatusTrends(thirtyDaysAgo: Date, workspaceId: number | null, transaction?: Transaction) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
       attributes: [
@@ -385,8 +474,18 @@ export class TaskRepository implements ITaskWriter {
           },
           attributes: [],
         },
+        {
+          model: this.db.User,
+          as: "user",
+          where: {
+            workspace_id: workspaceId,
+          },
+          attributes: [],
+        },
       ],
       group: [sequelize.fn("DATE", sequelize.col("Task.updatedAt"))],
+      order: [[sequelize.fn("DATE", sequelize.col("Task.updatedAt")), "ASC"]],
+      raw: true,
       transaction,
     });
   }

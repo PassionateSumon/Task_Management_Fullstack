@@ -52,7 +52,7 @@ export const updateStatusHandler = async (req: Request, h: ResponseToolkit) => {
 export const deleteStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const { userId } = req.auth.credentials as any;
-    const payload = req.payload as { id: number };
+    const payload = req.payload as { id: number; new_final_id?: number };
     const result = await status().deleteStatus(String(userId), payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);

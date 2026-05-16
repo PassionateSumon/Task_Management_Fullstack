@@ -230,8 +230,8 @@ export class StatusService {
     }
   }
 
-  async deleteStatus(userId: string, params: { id: number }): Promise<StatusOpResult> {
-    const { id } = params;
+  async deleteStatus(userId: string, params: { id: number; new_final_id?: number }): Promise<StatusOpResult> {
+    const { id, new_final_id } = params;
     try {
       return (await withTransaction(async (transaction) => {
         const ws = await this.requireWorkspaceId(userId, transaction);
@@ -252,6 +252,25 @@ export class StatusService {
             message: "System statuses cannot be deleted",
             data: null,
           };
+        }
+
+        if (result.is_final) {
+          if (!new_final_id) {
+            return {
+              statusCode: 400,
+              message: "Please select another status to be the new final status",
+              data: null,
+            };
+          }
+          const newFinal = await this.status.findOneRaw(new_final_id, transaction);
+          if (!newFinal || newFinal.workspace_id !== ws.workspaceId) {
+            return {
+              statusCode: 404,
+              message: "New final status not found",
+              data: null,
+            };
+          }
+          await this.status.updateFields(new_final_id, { is_final: true }, transaction);
         }
 
         await this.tasks.deleteTasksByStatusId(id, transaction);

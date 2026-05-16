@@ -1,6 +1,7 @@
 import { Op } from "sequelize";
 import type { Transaction } from "sequelize";
 import type { DbRegistry } from "./db-registry.types.js";
+import { USER_TYPE } from "../../common/constants/constants.js";
 
 export class UserRepository {
   constructor(private readonly db: DbRegistry) {}
@@ -92,17 +93,30 @@ export class UserRepository {
     return this.db.User.destroy({ where: { id }, transaction });
   }
 
-  async countActiveNonAdminUsers(transaction?: Transaction) {
+  async countActiveNonAdminUsers(
+    workspaceId: number | null,
+    transaction?: Transaction
+  ) {
     return this.db.User.count({
-      where: { isActive: true, user_type: "user" },
+      where: {
+        isActive: true,
+        user_type: USER_TYPE.USER,
+        workspace_id: workspaceId || null,
+      },
       transaction,
     });
   }
 
-  async findRecentUsersForDashboard(transaction?: Transaction) {
+  async findRecentUsersForDashboard(
+    workspaceId: number | null,
+    transaction?: Transaction
+  ) {
     return this.db.User.findAll({
       attributes: { exclude: ["password", "otp"] },
-      where: { user_type: "user" },
+      where: {
+        user_type: USER_TYPE.USER,
+        workspace_id: workspaceId || null,
+      },
       order: [["createdAt", "DESC"]],
       limit: 5,
       raw: true,
@@ -112,10 +126,14 @@ export class UserRepository {
 
   async countUsersWithRecentTaskActivity(
     thirtyDaysAgo: Date,
+    workspaceId: number | null,
     transaction?: Transaction
   ) {
     return this.db.User.count({
-      where: { user_type: "user" },
+      where: {
+        user_type: USER_TYPE.USER,
+        workspace_id: workspaceId || null,
+      },
       include: [
         {
           model: this.db.Task,
@@ -143,9 +161,15 @@ export class UserRepository {
     });
   }
 
-  async findAllBasicUsersWithActiveFlag(transaction?: Transaction) {
+  async findAllBasicUsersWithActiveFlag(
+    workspaceId: number | null,
+    transaction?: Transaction
+  ) {
     return this.db.User.findAll({
-      where: { user_type: "user" },
+      where: {
+        user_type: USER_TYPE.USER,
+        workspace_id: workspaceId || null,
+      },
       attributes: ["id", "name", "email", "isActive"],
       transaction,
     });

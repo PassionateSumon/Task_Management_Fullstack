@@ -120,8 +120,9 @@ export class StatusRepository implements IStatusReader {
     return this.db.Status.destroy({ where: { id }, transaction });
   }
 
-  async findAllWithTasks(transaction?: Transaction) {
+  async findAllWithTasks(workspaceId: number | null, transaction?: Transaction) {
     return this.db.Status.findAll({
+      where: { workspace_id: workspaceId },
       attributes: ["id", "name", "workspace_id", "is_system", "is_final"],
       include: [{ model: this.db.Task, as: "tasks" }],
       transaction,

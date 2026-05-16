@@ -11,41 +11,56 @@ export class DashboardService {
     private readonly statuses: StatusRepository
   ) {}
 
-  async getDashboard() {
+  async getDashboard(currentUserId: number) {
     try {
       return await withTransaction(async (transaction) => {
         const currentDate = new Date();
 
-        const activeUsersCount = await this.users.countActiveNonAdminUsers(
+        const userWorkspaceId = await this.users.findWorkspaceIdByUserId(
+          currentUserId,
           transaction
         );
 
-        const totalTasks = await this.tasks.countAll(transaction);
+        const activeUsersCount = await this.users.countActiveNonAdminUsers(
+          userWorkspaceId,
+          transaction
+        );
+
+        const totalTasks = await this.tasks.countAll(
+          userWorkspaceId,
+          transaction
+        ); 
 
         const tasksByStatusRaw = await this.statuses.findAllWithTasks(
+          userWorkspaceId,
           transaction
         );
 
         const tasksByPriorityRaw = await this.tasks.findGroupedByPriority(
+          userWorkspaceId, 
           transaction
         );
 
         const overdueTasks = await this.tasks.countOverdue(
           currentDate,
+          userWorkspaceId,
           transaction
         );
 
         const recentTasks = await this.tasks.findRecentWithUserAndStatus(
+          userWorkspaceId,
           transaction
         );
 
         const recentUsers = await this.users.findRecentUsersForDashboard(
+          userWorkspaceId, 
           transaction
         );
 
         const currentYear = currentDate.getFullYear();
         const monthlyTasks = await this.tasks.findMonthlyTasks(
           currentYear,
+          userWorkspaceId,
           transaction
         );
 
@@ -53,18 +68,30 @@ export class DashboardService {
         const weeklyTasks = await this.tasks.findWeeklyTasks(
           currentYear,
           currentMonth,
+          userWorkspaceId,
           transaction
         );
 
-        const yearlyTasks = await this.tasks.findYearlyByStartDate(transaction);
+        const yearlyTasks = await this.tasks.findYearlyByStartDate(
+          userWorkspaceId,
+          transaction
+        );
 
-        const completedTasks = await this.tasks.countCompleted(transaction);
+        const completedTasks = await this.tasks.countCompleted(
+          userWorkspaceId, 
+          transaction
+        );
+
         const completionRate =
           totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
-        const tasksPerUser = await this.tasks.findTasksPerUser(transaction);
+        const tasksPerUser = await this.tasks.findTasksPerUser(
+          userWorkspaceId,
+          transaction
+        );
 
         const avgTaskDuration = await this.tasks.findAvgDurationCompleted(
+          userWorkspaceId,
           transaction
         );
 
@@ -73,17 +100,22 @@ export class DashboardService {
         );
         const statusTrends = await this.tasks.findStatusTrends(
           thirtyDaysAgo,
+          userWorkspaceId,
           transaction
         );
 
         const activeUsersLast30Days =
           await this.users.countUsersWithRecentTaskActivity(
             thirtyDaysAgo,
+            userWorkspaceId,
             transaction
           );
 
         const allIsActiveUsers =
-          await this.users.findAllBasicUsersWithActiveFlag(transaction);
+          await this.users.findAllBasicUsersWithActiveFlag(
+            userWorkspaceId, 
+            transaction
+          );
 
         const dashboardData: Record<string, unknown> = {
           activeUsers: activeUsersCount,

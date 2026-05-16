@@ -13,4 +13,5 @@ export const updateStatusPayloadSchema = Joi.object({
 
 export const deleteStatusPayloadSchema = Joi.object({
   id: Joi.number().integer().positive().required(),
+  new_final_id: Joi.number().integer().positive().optional(),
 });

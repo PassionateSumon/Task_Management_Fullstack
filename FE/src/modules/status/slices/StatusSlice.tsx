@@ -74,10 +74,10 @@ export const updateStatus = createAsyncThunk(
 
 export const deleteStatus = createAsyncThunk(
   "status/deleteStatus",
-  async ({ id }: { id: number }, { rejectWithValue, getState }) => {
+  async ({ id, new_final_id }: { id: number; new_final_id?: number }, { rejectWithValue, getState }) => {
     try {
       const response = await axiosInstance.delete("/status/delete", {
-        data: { id },
+        data: { id, new_final_id },
         headers: { "X-Skip-Loader": "true" }
       });
       return response.data;

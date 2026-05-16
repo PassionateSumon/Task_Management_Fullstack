@@ -9,6 +9,7 @@ type Props = {
   cancelLabel?: string;
   onConfirm: () => void;
   onClose: () => void;
+  children?: React.ReactNode;
 };
 
 const DeleteConfirmModal: React.FC<Props> = ({
@@ -19,6 +20,7 @@ const DeleteConfirmModal: React.FC<Props> = ({
   cancelLabel = "Cancel",
   onConfirm,
   onClose,
+  children,
 }) => {
   if (!isOpen) return null;
 
@@ -42,6 +44,7 @@ const DeleteConfirmModal: React.FC<Props> = ({
             </div>
             <div>
               <p className="text-sm text-slate-700">{message}</p>
+              {children && <div className="mt-4">{children}</div>}
             </div>
           </div>
 
