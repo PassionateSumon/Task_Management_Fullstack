@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import { loadingManager } from "./common/utils/AxiosInstance";
-import { DotLoader } from "react-spinners";
 import ToastInit from "./common/utils/ToastInit";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import SignupPage from "./modules/auth/pages/SignupPage";
 import LoginPage from "./modules/auth/pages/LoginPage";
 import ProtectedRoute from "./common/utils/ProtectedRoute";
-// import Otp from "./modules/auth/components/Otp";
-// import ResetPassword from "./modules/auth/components/ResetPassword";
 import type { AppDispatch } from "./store/store";
 import { useDispatch, useSelector } from "react-redux";
 import { checkAuthStatus } from "./modules/auth/slices/AuthSlice";
@@ -21,6 +18,7 @@ import type { RootState } from "./store/store";
 import InviteUserOrAdmin from "./modules/user/components/InviteUserOrAdmin";
 import Profile from "./modules/user/components/Profile";
 import Landing from "./common/components/Landing";
+import { CustomLoader } from "./common/components/CustomLoader";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -50,20 +48,14 @@ function App() {
 
   if (!checkAuth)
     return (
-      <DotLoader
-        cssOverride={{ position: "fixed", top: "50%", left: "50%" }}
-        speedMultiplier={1}
-      />
+      <CustomLoader />
     );
 
 
   return (
     <>
       {isLoading && (
-        <DotLoader
-          cssOverride={{ position: "fixed", top: "50%", left: "50%" }}
-          speedMultiplier={1}
-        />
+        <CustomLoader />
       )}
       <ToastInit />
 
@@ -71,8 +63,6 @@ function App() {
         <Route path="/" element={isLoggedIn ? <Navigate to="/home/task" /> : <Landing />} />
         <Route path="/signup" element={isLoggedIn ? <Navigate to="/home/task" /> : <SignupPage />} />
         <Route path="/login" element={isLoggedIn ? <Navigate to="/home/task" /> : <LoginPage />} />
-        {/* <Route path="/reset-password" element={isLoggedIn ? <Navigate to="/home/task" /> : <ResetPassword />} />
-        <Route path="/otp-verification" element={isLoggedIn ? <Navigate to="/home/task" /> : <Otp />} /> */}
 
         <Route element={<ProtectedRoute />}>
           <Route path="/home" element={<HomeLayout />}>

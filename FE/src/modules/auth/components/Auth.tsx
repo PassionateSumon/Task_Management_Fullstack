@@ -1,4 +1,4 @@
-import { AtSign, Lock, Mail, User, LayoutDashboard, CheckSquare, BarChart2, ShieldCheck } from "lucide-react";
+import { AtSign, Lock, Mail, User, LayoutDashboard, CheckSquare, BarChart2, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { useState, type ChangeEvent, type FC, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
@@ -48,6 +48,7 @@ const Auth: FC<AuthProps> = ({ from }) => {
     name: "", email: "", emailOrUsername: "", password: "", user_type: "admin",
   });
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormData, string | null>>>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const dispatch = useDispatch<AppDispatch>();
   const navigate  = useNavigate();
@@ -85,51 +86,76 @@ const Auth: FC<AuthProps> = ({ from }) => {
     }
   };
 
-  const renderInput = (label: string, key: keyof FormData, type: string, Icon: any) => (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={key} className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-        {label}
-      </label>
-      <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-all ${
-        fieldErrors[key]
-          ? "border-red-300 bg-red-50"
-          : "border-gray-200 bg-[#F3F4FE] focus-within:border-[#5A67D8] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#5A67D8]/10"
-      }`}>
-        <Icon className={`w-4 h-4 flex-shrink-0 ${fieldErrors[key] ? "text-red-400" : "text-gray-400"}`} />
-        <input
-          id={key}
-          type={type}
-          placeholder={`Enter your ${label.toLowerCase()}`}
-          value={formData[key] as string}
-          onChange={e => handleChange(e, key)}
-          className="flex-1 outline-none bg-transparent text-sm text-gray-800 placeholder-gray-400"
-        />
+  const renderInput = (label: string, key: keyof FormData, type: string, Icon: any) => {
+    const isPassword = key === "password";
+    const inputType = isPassword ? (showPassword ? "text" : "password") : type;
+    const hasError = !!fieldErrors[key];
+
+    return (
+      <div className="flex flex-col gap-1">
+        <label htmlFor={key} className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+          {label}
+        </label>
+        <div className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-all ${
+          hasError
+            ? "border-red-300 bg-red-50"
+            : "border-gray-200 bg-[#F3F4FE] focus-within:border-[#5A67D8] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#5A67D8]/10"
+        }`}>
+          <Icon className={`w-4 h-4 flex-shrink-0 ${hasError ? "text-red-400" : "text-gray-400"}`} />
+
+          <input
+            id={key}
+            type={inputType}
+            placeholder={`Enter your ${label.toLowerCase()}`}
+            value={formData[key] as string}
+            onChange={e => handleChange(e, key)}
+            className="flex-1 outline-none bg-transparent text-sm text-gray-800 placeholder-gray-400 min-w-0"
+          />
+
+          {isPassword && (
+            <button
+              type="button"
+              onClick={() => setShowPassword(p => !p)}
+              className={`cursor-pointer flex-shrink-0 p-0.5 rounded transition-colors ${
+                hasError
+                  ? "text-red-300 hover:text-red-400"
+                  : "text-gray-400 hover:text-[#5A67D8]"
+              }`}
+              tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword
+                ? <EyeOff className="w-4 h-4" />
+                : <Eye className="w-4 h-4" />
+              }
+            </button>
+          )}
+        </div>
+
+        {hasError && (
+          <p className="text-[11px] text-red-500 font-medium">{fieldErrors[key]}</p>
+        )}
       </div>
-      {fieldErrors[key] && (
-        <p className="text-[11px] text-red-500 font-medium">{fieldErrors[key]}</p>
-      )}
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen flex bg-white">
 
       {/* ── Left panel — branding ── */}
       <div className="hidden lg:flex w-[420px] flex-shrink-0 bg-[#5A67D8] flex-col justify-between p-10">
-        {/* Logo */}
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
             <LayoutDashboard className="w-4 h-4 text-white" />
           </div>
           <span
-          className="text-white font-bold text-base tracking-tight cursor-pointer"
-          onClick={() => navigate("/")}
+            className="text-white font-bold text-base tracking-tight cursor-pointer"
+            onClick={() => navigate("/")}
           >
             Task Vault
           </span>
         </div>
 
-        {/* Center copy */}
         <div className="space-y-6">
           <div>
             <h2 className="text-3xl font-bold text-white leading-snug tracking-tight">
@@ -139,8 +165,6 @@ const Auth: FC<AuthProps> = ({ from }) => {
               Track tasks, analyze progress, and collaborate — all in one place.
             </p>
           </div>
-
-          {/* Feature list */}
           <div className="flex flex-col gap-3">
             {features.map((f, i) => (
               <div key={i} className="flex items-center gap-3">
@@ -153,7 +177,6 @@ const Auth: FC<AuthProps> = ({ from }) => {
           </div>
         </div>
 
-        {/* Footer */}
         <p className="text-white/30 text-xs">© 2026 Task Vault Inc.</p>
       </div>
 
@@ -171,7 +194,6 @@ const Auth: FC<AuthProps> = ({ from }) => {
 
           {/* Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-            {/* Header */}
             <div className="mb-7">
               <h1 className="text-xl font-bold text-gray-900 tracking-tight">
                 {from === "signup" ? "Create your account" : "Welcome back"}

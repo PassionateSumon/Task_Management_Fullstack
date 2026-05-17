@@ -27,64 +27,63 @@ const HomeLayout = () => {
   return (
     <div className="flex h-screen overflow-hidden bg-[#F3F4FE]">
 
-      {/* ── Sidebar — fixed height, never scrolls ── */}
-      <aside className="w-56 h-full flex-shrink-0 bg-white border-r border-gray-100 flex flex-col justify-between py-5 px-3 overflow-hidden">
+      {/* ── Sidebar ── */}
+      <aside className="w-56 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col h-screen">
 
-        {/* Top section */}
-        <div className="flex flex-col gap-6 min-h-0">
+        {/* Logo — fixed at top */}
+        <div className="flex items-center gap-2.5 px-5 py-5 flex-shrink-0">
+          <div className="w-7 h-7 bg-[#5A67D8] rounded-lg flex items-center justify-center flex-shrink-0">
+            <LayoutDashboard className="w-3.5 h-3.5 text-white" />
+          </div>
+          <span className="text-sm font-bold text-gray-900 tracking-tight">Task Vault</span>
+        </div>
 
-          {/* Logo */}
-          <div className="flex items-center gap-2.5 px-2">
-            <div className="w-7 h-7 bg-[#5A67D8] rounded-lg flex items-center justify-center flex-shrink-0">
-              <LayoutDashboard className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="text-sm font-bold text-gray-900 tracking-tight">Task Vault</span>
+        {/* Nav links — scrollable middle zone if needed */}
+        <div className="flex-1 overflow-y-auto px-3 pb-3 flex flex-col gap-5 min-h-0 thin-scrollbar"
+          style={{ scrollbarWidth: "thin", scrollbarColor: "#E2E8F0 transparent" }}
+        >
+
+          {/* Core Menu */}
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-1.5">
+              Core Menu
+            </p>
+            <nav className="flex flex-col gap-0.5">
+              <NavLink to="task" className={navLink}>
+                <CheckSquare className="w-4 h-4 flex-shrink-0" />
+                Tasks
+              </NavLink>
+              {role === "admin" && (
+                <NavLink to="status" className={navLink}>
+                  <Activity className="w-4 h-4 flex-shrink-0" />
+                  Status
+                </NavLink>
+              )}
+            </nav>
           </div>
 
-          {/* Nav */}
-          <div className="flex flex-col gap-5">
-            {/* Core Menu */}
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-1.5">
-                Core Menu
-              </p>
-              <nav className="flex flex-col gap-0.5">
-                <NavLink to="task" className={navLink}>
-                  <CheckSquare className="w-4 h-4 flex-shrink-0" />
-                  Tasks
+          {/* Analytics */}
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-1.5">
+              Analytics
+            </p>
+            <nav className="flex flex-col gap-0.5">
+              <NavLink to="dashboard/me" end className={navLink}>
+                <BarChart2 className="w-4 h-4 flex-shrink-0" />
+                Personal Board
+              </NavLink>
+              {role === "admin" && (
+                <NavLink to="dashboard" end className={navLink}>
+                  <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                  Admin Board
                 </NavLink>
-                {role === "admin" && (
-                  <NavLink to="status" className={navLink}>
-                    <Activity className="w-4 h-4 flex-shrink-0" />
-                    Status
-                  </NavLink>
-                )}
-              </nav>
-            </div>
-
-            {/* Analytics */}
-            <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-1.5">
-                Analytics
-              </p>
-              <nav className="flex flex-col gap-0.5">
-                <NavLink to="dashboard/me" end className={navLink}>
-                  <BarChart2 className="w-4 h-4 flex-shrink-0" />
-                  Personal Board
-                </NavLink>
-                {role === "admin" && (
-                  <NavLink to="dashboard" end className={navLink}>
-                    <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-                    Admin Board
-                  </NavLink>
-                )}
-              </nav>
-            </div>
+              )}
+            </nav>
           </div>
         </div>
 
-        {/* Bottom — profile + logout, always pinned */}
-        <div className="flex flex-col gap-0.5 pt-4 border-t border-gray-100 flex-shrink-0">
+        {/* Bottom — always pinned, never overlaps */}
+        <div className="flex-shrink-0 border-t border-gray-100 px-3 py-3 flex flex-col gap-0.5">
           <NavLink
             to="profile"
             className={({ isActive }) =>
@@ -97,9 +96,7 @@ const HomeLayout = () => {
               <span className="text-xs font-bold text-white">{initial}</span>
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-800 leading-tight truncate">
-                My Profile
-              </p>
+              <p className="text-xs font-semibold text-gray-800 leading-tight">My Profile</p>
               <p className="text-[10px] text-gray-400 uppercase tracking-wide">{role}</p>
             </div>
           </NavLink>
@@ -114,7 +111,7 @@ const HomeLayout = () => {
         </div>
       </aside>
 
-      {/* ── Main — independent scroll, sidebar unaffected ── */}
+      {/* ── Main content — only this scrolls ── */}
       <main className="flex-1 overflow-y-auto min-w-0">
         <Outlet />
       </main>
