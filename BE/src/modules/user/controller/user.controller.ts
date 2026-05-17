@@ -1,17 +1,13 @@
 import { error, success } from "../../../common/utils/returnFunctions.js";
-import {
-  deleteUserService,
-  getAllUsersService,
-  getSingleUserService,
-  toggleActiveService,
-  updateDetailsService,
-} from "../service/user.service.js";
 import { Request, ResponseToolkit } from "@hapi/hapi";
+import { getAppContainer } from "../../../composition/app-container.js";
+
+const users = () => getAppContainer().userService;
 
 export const getAllUsersHandler = async (req: Request, h: ResponseToolkit) => {
   try {
-    const {userId} = req.auth.credentials as any;
-    const result = await getAllUsersService(userId);
+    const { userId } = req.auth.credentials as any;
+    const result = await users().getAllUsers(userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Users fetched successfully", 200)(h);
@@ -25,9 +21,9 @@ export const getSingleUserHandler = async (
   h: ResponseToolkit
 ) => {
   try {
-    const id = req.params.id as number;
+    const id = req.query.id;
     const { userId } = req.auth.credentials as any;
-    const result = await getSingleUserService(id, userId);
+    const result = await users().getSingleUser(id, userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "User fetched successfully", 200)(h);
@@ -39,7 +35,7 @@ export const getSingleUserHandler = async (
 export const toggleActiveHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const id = req.params.id as number;
-    const result = await toggleActiveService(id);
+    const result = await users().toggleActive(id);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "User fetched successfully", 200)(h);
@@ -53,9 +49,9 @@ export const updateDetailsHandler = async (
   h: ResponseToolkit
 ) => {
   try {
-    const {userId} = req.auth.credentials as any;
+    const { userId } = req.auth.credentials as any;
     const payload = req.payload as { name: string };
-    const result = await updateDetailsService(userId, payload);
+    const result = await users().updateDetails(userId, payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "User fetched successfully", 200)(h);
@@ -67,7 +63,7 @@ export const updateDetailsHandler = async (
 export const deleteUserHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const id = req.params.id as number;
-    const result = await deleteUserService(id);
+    const result = await users().deleteUser(id);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "User deleted successfully", 200)(h);

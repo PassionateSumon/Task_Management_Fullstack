@@ -10,7 +10,9 @@ const initialState: UserState = {
 
 export const getUser = createAsyncThunk("user/getUser", async ({ id = null }: { id?: number | null }, { rejectWithValue }) => {
     try {
-        const res = await axiosInstance.get(`/user/single/${id}`);
+        let url = '/user/single';
+        if (id) url += `?id=${id}`;
+        const res = await axiosInstance.get(url);
         return res.data;
     } catch (error: any) {
         return rejectWithValue(
@@ -21,7 +23,6 @@ export const getUser = createAsyncThunk("user/getUser", async ({ id = null }: { 
 
 export const updateUser = createAsyncThunk("user/updateUser", async (data: { name: string }, { rejectWithValue, getState }) => {
     try {
-        // console.log(data)
         const res = await axiosInstance.put(`/user/update`, { ...data }, {
             headers: { "X-Skip-Loader": "true" }
         });

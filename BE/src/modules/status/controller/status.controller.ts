@@ -1,16 +1,17 @@
 import { Request, ResponseToolkit } from "@hapi/hapi";
 import { error, success } from "../../../common/utils/returnFunctions.js";
-import {
-  createstatusService,
-  deleteStatusService,
-  getAllStatusService,
-  updateStatusService,
-} from "../service/status.service.js";
+import { getAppContainer } from "../../../composition/app-container.js";
+
+const status = () => getAppContainer().statusService;
 
 export const createStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
-    const payload = req.payload as any;
-    const result = await createstatusService(payload);
+    const { userId } = req.auth.credentials as any;
+    const payload = req.payload as {
+      name: string;
+      is_final?: boolean;
+    };
+    const result = await status().createStatus(userId, payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status created successfully", 200)(h);
@@ -21,7 +22,8 @@ export const createStatusHandler = async (req: Request, h: ResponseToolkit) => {
 
 export const getAllStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
-    const result = await getAllStatusService();
+    const { userId } = req.auth.credentials as any;
+    const result = await status().getAllStatuses(userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status fetched successfully", 200)(h);
@@ -32,8 +34,13 @@ export const getAllStatusHandler = async (req: Request, h: ResponseToolkit) => {
 
 export const updateStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
-    const payload = req.payload as { id: number, name: string }
-    const result = await updateStatusService(payload);
+    const { userId } = req.auth.credentials as any;
+    const payload = req.payload as {
+      id: number;
+      name: string;
+      is_final?: boolean;
+    };
+    const result = await status().updateStatus(userId, payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status updated successfully", 200)(h);
@@ -44,8 +51,9 @@ export const updateStatusHandler = async (req: Request, h: ResponseToolkit) => {
 
 export const deleteStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
-    const payload = req.payload as { id: number }
-    const result = await deleteStatusService(payload);
+    const { userId } = req.auth.credentials as any;
+    const payload = req.payload as { id: number; new_final_id?: number };
+    const result = await status().deleteStatus(userId, payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status deleted successfully", 200)(h);

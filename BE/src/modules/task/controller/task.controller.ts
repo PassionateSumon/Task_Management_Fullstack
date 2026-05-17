@@ -1,12 +1,8 @@
 import { Request, ResponseToolkit } from "@hapi/hapi";
-import {
-  createTaskService,
-  deleteTaskService,
-  getAllTaskService,
-  getSingleTaskService,
-  updateTaskService,
-} from "../service/task.service.js";
 import { error, success } from "../../../common/utils/returnFunctions.js";
+import { getAppContainer } from "../../../composition/app-container.js";
+
+const task = () => getAppContainer().taskService;
 
 export const createTaskHandler = async (req: Request, h: ResponseToolkit) => {
   try {
@@ -19,11 +15,9 @@ export const createTaskHandler = async (req: Request, h: ResponseToolkit) => {
       start_date?: string;
       end_date?: string;
     };
-    // console.log(payload)
-    const result = await createTaskService(payload, userId);
+    const result = await task().createTask(payload, userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
-    // console.log("here clear");
     return success(result.data, "Task created successfully", 200)(h);
   } catch (err: any) {
     return error(null, err.message || "Internal server error", 500)(h);
@@ -33,12 +27,11 @@ export const createTaskHandler = async (req: Request, h: ResponseToolkit) => {
 export const getAllTaskHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const { userId, roleId } = req.auth.credentials as any;
-    const reqUserId = req.params.id as string | null;
-    const viewType = req.params.viewType as "kanban" | "compact" | "calendar";
-    const result = await getAllTaskService(viewType, userId, roleId, reqUserId);
+    const viewType = req.query.viewType as "kanban" | "compact" | "calendar" | "table";
+    const reqUserId = req.query.id as string | null;
+    const result = await task().getAllTasks(viewType, userId, roleId, reqUserId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
-    // console.log("res ---> ", result.data);
     return success(result.data, "Tasks fetched successfully", 200)(h);
   } catch (err: any) {
     return error(null, err.message || "Internal server error", 500)(h);
@@ -51,7 +44,7 @@ export const getSingleTaskHandler = async (
 ) => {
   try {
     const id = req.params.id as number;
-    const result = await getSingleTaskService({ id });
+    const result = await task().getSingleTask({ id });
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Task fetched successfully", 200)(h);
@@ -68,7 +61,7 @@ export const updateTaskHandler = async (req: Request, h: ResponseToolkit) => {
       description?: string;
       status?: string;
     };
-    const result = await updateTaskService(id, payload);
+    const result = await task().updateTask(id, payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Task updated successfully", 200)(h);
@@ -80,7 +73,7 @@ export const updateTaskHandler = async (req: Request, h: ResponseToolkit) => {
 export const deleteTaskHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const id = req.params.id as number;
-    const result = await deleteTaskService(id);
+    const result = await task().deleteTask(id);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status deleted successfully", 200)(h);

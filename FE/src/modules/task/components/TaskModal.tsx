@@ -6,42 +6,18 @@ import { toast } from "react-toastify";
 import type { ExtendedTaskModalProps } from "../types/Task.interface";
 import { X, Calendar, Flag, Tag, Trash2, Edit3, Save, Info } from "lucide-react";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
-
 import {
-  ClassicEditor,
-  Bold,
-  Essentials,
-  Heading,
-  Indent,
-  IndentBlock,
-  Italic,
-  Link,
-  List,
-  MediaEmbed,
-  Paragraph,
-  Table,
-  Undo,
+  ClassicEditor, Bold, Essentials, Heading, Indent, IndentBlock,
+  Italic, Link, List, MediaEmbed, Paragraph, Table, Undo,
 } from "ckeditor5";
-
 import "ckeditor5/ckeditor5.css";
 
 const TaskModal = ({
-  isOpen,
-  onClose,
-  mode,
-  task,
-  statuses,
-  activeView,
-  handleEditTask,
-  handleDeleteTask,
+  isOpen, onClose, mode, task, statuses, activeView,
+  handleEditTask, handleDeleteTask,
 }: ExtendedTaskModalProps) => {
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    status: "",
-    priority: "",
-    start_date: "",
-    end_date: "",
+    name: "", description: "", status: "", priority: "", start_date: "", end_date: "",
   });
 
   const dispatch = useDispatch<AppDispatch>();
@@ -53,74 +29,38 @@ const TaskModal = ({
       setFormData({
         name: task.task_name || "",
         description: task.task_description || "",
-        status:
-          typeof task?.status === "string"
-            ? task.status
-            : task?.status?.name || "",
+        status: typeof task?.status === "string" ? task.status : task?.status?.name || "",
         priority: task.priority || "",
         start_date: task.start_date ? task.start_date.split("T")[0] : "",
         end_date: task.end_date ? task.end_date.split("T")[0] : "",
       });
     } else {
-      setFormData({
-        name: "",
-        description: "",
-        status: "",
-        priority: "",
-        start_date: "",
-        end_date: "",
-      });
+      setFormData({ name: "", description: "", status: "", priority: "", start_date: "", end_date: "" });
     }
   }, [task, mode]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-        handleOnClose();
-      }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node)) handleOnClose();
     };
-
     if (isOpen) document.addEventListener("mousedown", handleClickOutside);
-
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  const handleChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setFormData(p => ({ ...p, [e.target.name]: e.target.value }));
   };
 
   const handleOnClose = () => {
     onClose();
-    setFormData({
-      name: "",
-      description: "",
-      status: "",
-      priority: "",
-      start_date: "",
-      end_date: "",
-    });
+    setFormData({ name: "", description: "", status: "", priority: "", start_date: "", end_date: "" });
   };
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.status) {
-      toast.error("Task name and status are required.");
-      return;
+    if (!formData.name || !formData.status) { toast.error("Task name and status are required."); return; }
+    if (formData.start_date && formData.end_date && new Date(formData.end_date) < new Date(formData.start_date)) {
+      toast.error("Due date cannot be before start date."); return;
     }
-
-    // Validate that end_date is not before start_date
-    if (formData.start_date && formData.end_date) {
-      const startDate = new Date(formData.start_date);
-      const endDate = new Date(formData.end_date);
-      if (endDate < startDate) {
-        toast.error("Due date cannot be before start date.");
-        return;
-      }
-    }
-
     const payload = {
       name: formData.name,
       description: formData.description || undefined,
@@ -129,194 +69,123 @@ const TaskModal = ({
       start_date: formData.start_date || undefined,
       end_date: formData.end_date || undefined,
     };
-
+    const viewType = activeView === "collapsed" ? "compact" : activeView;
     if (mode === "add") {
       const result = await dispatch(createTask(payload));
-
-      if (createTask.fulfilled.match(result)) {
-        toast.success("Task created!");
-        onClose();
-        dispatch(
-          getAllTasks({
-            viewType: activeView === "collapsed" ? "compact" : activeView,
-          })
-        );
+      if (createTask.fulfilled.match(result)) { 
+        toast.success("Task created!"); 
       }
     } else if (mode === "edit" && task?.id) {
       const result = await dispatch(updateTask({ id: task.id, payload }));
-
-      if (updateTask.fulfilled.match(result)) {
-        toast.success("Task updated!");
-        onClose();
-        dispatch(getAllTasks({ viewType: activeView === "collapsed" ? "compact" : activeView }));
+      if (updateTask.fulfilled.match(result)) { 
+        toast.success("Task updated!"); 
       }
     }
+    setFormData({ name: "", description: "", status: "", priority: "", start_date: "", end_date: "" });
+    onClose(); 
+    dispatch(getAllTasks({ viewType })); 
   };
 
   if (!isOpen) return null;
-
   const isViewMode = mode === "view";
 
-  const labelClass =
-    "text-[11px] font-bold text-slate-400 uppercase tracking-[0.1em] mb-1.5 flex items-center gap-1.5";
-
-  const inputClass =
-    "w-full p-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all disabled:opacity-75 disabled:cursor-not-allowed";
+  const labelCls = "text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5";
+  const inputCls = "w-full px-3 py-2.5 bg-[#F3F4FE] border border-transparent rounded-lg text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5A67D8]/20 focus:border-[#5A67D8] transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-[100] p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[6px] transition-opacity animate-in fade-in duration-300"></div>
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
 
       <div
         ref={modalRef}
-        className="relative bg-white rounded-[28px] w-full max-w-2xl overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className="relative bg-white rounded-2xl w-full max-w-lg shadow-xl flex flex-col max-h-[90vh]"
       >
-        {/* Modal Header */}
-        <div className="px-10 py-7 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-sm sticky top-0 z-20">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm">
-              <Edit3 size={24} />
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
+              <Edit3 size={14} className="text-[#5A67D8]" />
             </div>
-
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
-                {mode === "add"
-                  ? "Create New Task"
-                  : mode === "edit"
-                  ? "Edit Task"
-                  : "Task Details"}
-              </h2>
-
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
-                  {mode === "add" ? "New" : "Task Board"}
-                </p>
-              </div>
-            </div>
+            <h2 className="text-sm font-bold text-gray-800">
+              {mode === "add" ? "New Task" : mode === "edit" ? "Edit Task" : "Task Details"}
+            </h2>
           </div>
-
           <button
             onClick={handleOnClose}
-            className="p-2.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-600 transition-all cursor-pointer border border-transparent hover:border-slate-200"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="px-10 py-8 overflow-y-auto thin-scrollbar space-y-8 bg-white">
-          {/* Main Title Input */}
-          <div className="group">
-            <label htmlFor="name" className={labelClass}>
-              Task Name
-            </label>
+        {/* Scrollable body */}
+        <div className="overflow-y-auto thin-scrollbar px-6 py-5 space-y-4 flex-1">
 
+          {/* Task name */}
+          <div>
+            <label className={labelCls}>Task Name</label>
             <input
-              id="name"
-              name="name"
-              type="text"
-              value={formData.name}
-              onChange={handleChange}
-              disabled={isViewMode}
+              name="name" type="text" value={formData.name}
+              onChange={handleChange} disabled={isViewMode}
               placeholder="What needs to be done?"
-              className={`${inputClass} text-base font-semibold group-hover:border-slate-300`}
+              className={inputCls}
             />
           </div>
 
-          {/* Quick Properties Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+          {/* Status + Priority */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>
-                <Tag size={12} className="text-indigo-400" /> Current Status
+              <label className={labelCls}>
+                <Tag size={11} className="text-[#5A67D8]" /> Status
               </label>
-
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                disabled={isViewMode}
-                className={inputClass}
-              >
-                <option value="">Choose status...</option>
-                {statuses.map((s: string) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
+              <select name="status" value={formData.status} onChange={handleChange} disabled={isViewMode} className={inputCls}>
+                <option value="">Select...</option>
+                {statuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
-
             <div>
-              <label className={labelClass}>
-                <Flag size={12} className="text-rose-400" /> Priority Level
+              <label className={labelCls}>
+                <Flag size={11} className="text-red-400" /> Priority
               </label>
-
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleChange}
-                disabled={isViewMode}
-                className={inputClass}
-              >
-                <option value="">Set Priority...</option>
-                <option value="high">🔴 High Priority</option>
-                <option value="medium">🟡 Medium Priority</option>
-                <option value="low">🟢 Low Priority</option>
+              <select name="priority" value={formData.priority} onChange={handleChange} disabled={isViewMode} className={inputCls}>
+                <option value="">Select...</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
               </select>
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                <Calendar size={12} className="text-slate-400" /> Starting On
-              </label>
-
-              <input
-                name="start_date"
-                type="date"
-                value={formData.start_date}
-                onChange={handleChange}
-                disabled={isViewMode}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                <Calendar size={12} className="text-slate-400" /> Deadline
-              </label>
-
-              <input
-                name="end_date"
-                type="date"
-                value={formData.end_date}
-                onChange={handleChange}
-                disabled={isViewMode || !formData.start_date}
-                min={formData.start_date || ""}
-                className={inputClass}
-              />
-              {formData.start_date && !formData.end_date && (
-                <p className="text-xs text-slate-400 mt-1.5">Set deadline after start date</p>
-              )}
             </div>
           </div>
 
-          {/* Description Editor */}
-          <div className="space-y-2">
-            <label className={labelClass}>
-              <Info size={12} className="text-slate-400" /> Detailed Description
-            </label>
+          {/* Start + End date */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>
+                <Calendar size={11} /> Start Date
+              </label>
+              <input name="start_date" type="date" value={formData.start_date} onChange={handleChange} disabled={isViewMode} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>
+                <Calendar size={11} /> Deadline
+              </label>
+              <input
+                name="end_date" type="date" value={formData.end_date}
+                onChange={handleChange} disabled={isViewMode || !formData.start_date}
+                min={formData.start_date || ""}
+                className={inputCls}
+              />
+            </div>
+          </div>
 
-            <div
-              className={`rounded-2xl border ${
-                isViewMode
-                  ? "bg-slate-50/50 border-slate-200"
-                  : "bg-white border-slate-200 focus-within:border-indigo-500 shadow-sm transition-all overflow-hidden"
-              }`}
-            >
+          {/* Description */}
+          <div>
+            <label className={labelCls}>
+              <Info size={11} /> Description
+            </label>
+            <div className={`rounded-lg border overflow-hidden ${isViewMode ? "bg-[#F3F4FE] border-transparent" : "border-gray-200 focus-within:border-[#5A67D8] transition-colors"}`}>
               {isViewMode ? (
                 <div
-                  className="p-5 prose prose-sm max-w-none text-slate-600 min-h-[160px] leading-relaxed"
+                  className="p-3 prose prose-sm max-w-none text-gray-600 text-sm min-h-[100px] leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: formData.description }}
                 />
               ) : (
@@ -324,41 +193,11 @@ const TaskModal = ({
                   <CKEditor
                     editor={ClassicEditor}
                     data={formData.description}
-                    onChange={(_, editor) =>
-                      setFormData((p) => ({
-                        ...p,
-                        description: editor.getData(),
-                      }))
-                    }
+                    onChange={(_, editor) => setFormData(p => ({ ...p, description: editor.getData() }))}
                     config={{
                       licenseKey: "GPL",
-                      toolbar: [
-                        "undo",
-                        "redo",
-                        "|",
-                        "heading",
-                        "|",
-                        "bold",
-                        "italic",
-                        "|",
-                        "link",
-                        "bulletedList",
-                        "numberedList",
-                      ],
-                      plugins: [
-                        Bold,
-                        Essentials,
-                        Heading,
-                        Indent,
-                        IndentBlock,
-                        Italic,
-                        Link,
-                        List,
-                        MediaEmbed,
-                        Paragraph,
-                        Table,
-                        Undo,
-                      ],
+                      toolbar: ["undo", "redo", "|", "heading", "|", "bold", "italic", "|", "link", "bulletedList", "numberedList"],
+                      plugins: [Bold, Essentials, Heading, Indent, IndentBlock, Italic, Link, List, MediaEmbed, Paragraph, Table, Undo],
                     }}
                   />
                 </div>
@@ -367,53 +206,43 @@ const TaskModal = ({
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-10 py-6 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between mt-auto">
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
           <div>
             {(mode === "view" || mode === "edit") && task?.id && (
               <button
-                onClick={() => {
-                  handleDeleteTask(task.id);
-                  onClose();
-                }}
-                className="flex items-center gap-2 text-rose-500 hover:bg-rose-100/50 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                onClick={() => { handleDeleteTask(task.id); onClose(); }}
+                className="flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors cursor-pointer"
               >
-                <Trash2 size={16} /> Delete Task
+                <Trash2 size={13} /> Delete
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <button
               onClick={handleOnClose}
-              className="px-5 py-2.5 text-slate-500 font-bold text-sm hover:text-slate-900 transition-colors cursor-pointer"
+              className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
             >
-              Discard
+              Cancel
             </button>
 
             {mode === "view" ? (
               <button
                 onClick={() => task && handleEditTask(task)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-[0_8px_20px_-4px_rgba(79,70,229,0.4)] flex items-center gap-2 cursor-pointer active:scale-95"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#5A67D8] hover:bg-[#434190] text-white text-sm font-semibold rounded-lg transition-colors cursor-pointer"
               >
-                <Edit3 size={18} /> Modify
+                <Edit3 size={14} /> Edit
               </button>
             ) : (
               <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-[0_8px_20px_-4px_rgba(79,70,229,0.4)] flex items-center gap-2 disabled:opacity-50 cursor-pointer active:scale-95"
+                onClick={handleSubmit} disabled={loading}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#5A67D8] hover:bg-[#434190] text-white text-sm font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-50 active:scale-95"
               >
                 {loading ? (
-                  <span className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Saving...
-                  </span>
+                  <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</>
                 ) : (
-                  <>
-                    <Save size={18} />{" "}
-                    {mode === "add" ? "Create Task" : "Save Changes"}
-                  </>
+                  <><Save size={14} />{mode === "add" ? "Create" : "Save"}</>
                 )}
               </button>
             )}

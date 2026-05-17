@@ -4,18 +4,25 @@ import { format } from "date-fns";
 import { Calendar, FileText, Trash2, Edit2 } from "lucide-react";
 import type { TableViewProps } from "../types/Task.interface";
 
+const priorityConfig: Record<string, string> = {
+  high: "bg-red-50 text-red-600",
+  medium: "bg-orange-50 text-orange-600",
+  low: "bg-green-50 text-green-700",
+};
+
 const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, handleEditTask, handleDeleteTask }: TableViewProps) => {
+
   const columns = useMemo<ColumnDef<any>[]>(() => [
     {
       accessorKey: "task_name",
-      header: "Task Name",
+      header: "Task",
       cell: ({ row }) => (
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">
-            <FileText size={14} />
+          <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+            <FileText size={13} className="text-[#5A67D8]" />
           </div>
           <span
-            className="text-slate-900 font-semibold cursor-pointer hover:text-indigo-600 transition-colors truncate max-w-[200px]"
+            className="text-sm font-semibold text-gray-800 cursor-pointer hover:text-[#5A67D8] transition-colors truncate max-w-[180px]"
             onClick={() => handleOpenModal("view", row.original)}
           >
             {row.original.task_name || "Unnamed Task"}
@@ -30,9 +37,9 @@ const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, han
         const status = getValue() as string;
         const { color } = getStatusStyle(status);
         return (
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded-full border border-slate-100 bg-white w-fit shadow-sm">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-            <span className="text-slate-600 text-[13px] font-medium whitespace-nowrap">{status}</span>
+          <div className="flex items-center gap-1.5 w-fit">
+            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+            <span className="text-xs font-medium text-gray-600">{status}</span>
           </div>
         );
       },
@@ -41,16 +48,14 @@ const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, han
       accessorKey: "priority",
       header: "Priority",
       cell: ({ getValue }) => {
-        const priority = String(getValue() || "N/A").toLowerCase();
-        const colors: Record<string, string> = {
-          high: "bg-rose-50 text-rose-600 border-rose-100",
-          medium: "bg-amber-50 text-amber-600 border-amber-100",
-          low: "bg-emerald-50 text-emerald-600 border-emerald-100",
-        };
-        return (
-          <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider border ${colors[priority] || "bg-slate-50 text-slate-500 border-slate-100"}`}>
+        const priority = String(getValue() || "").toLowerCase();
+        const cls = priorityConfig[priority];
+        return cls ? (
+          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${cls}`}>
             {priority}
           </span>
+        ) : (
+          <span className="text-[10px] text-gray-300">—</span>
         );
       },
     },
@@ -60,23 +65,29 @@ const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, han
       cell: ({ getValue }) => {
         const date = getValue();
         return date ? (
-          <div className="flex items-center gap-2 text-slate-500 font-medium whitespace-nowrap">
-            <Calendar size={14} className="opacity-70" />
-            <span className="text-[13px]">{format(new Date(date as any), "MMM d, yyyy")}</span>
+          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <Calendar size={12} />
+            {format(new Date(date as any), "MMM d, yyyy")}
           </div>
-        ) : <span className="text-slate-300">--</span>;
+        ) : <span className="text-gray-300 text-xs">—</span>;
       },
     },
     {
       id: "actions",
-      header: "Actions",
+      header: "",
       cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <button onClick={() => handleEditTask(row.original)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer">
-            <Edit2 size={16} />
+        <div className="flex items-center gap-1 justify-end">
+          <button
+            onClick={() => handleEditTask(row.original)}
+            className="p-1.5 rounded-md text-gray-400 hover:text-[#5A67D8] hover:bg-indigo-50 transition-colors cursor-pointer"
+          >
+            <Edit2 size={14} />
           </button>
-          <button onClick={() => handleDeleteTask(row.original.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer">
-            <Trash2 size={16} />
+          <button
+            onClick={() => handleDeleteTask(row.original.id)}
+            className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+          >
+            <Trash2 size={14} />
           </button>
         </div>
       ),
@@ -86,30 +97,38 @@ const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, han
   const table = useReactTable({ data: tasks || [], columns, getCoreRowModel: getCoreRowModel() });
 
   return (
-    <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[calc(100vh-280px)]">
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm h-full flex flex-col overflow-hidden">
       <div className="flex-1 overflow-auto thin-scrollbar">
-        <table className="w-full text-left border-collapse min-w-[800px]">
-          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <th key={header.id} className="px-6 py-4 text-slate-500 text-[11px] font-bold uppercase tracking-[0.1em] border-b border-slate-100">
-                    {flexRender(header.column.columnDef.header, header.getContext())}
+        <table className="w-full text-left border-collapse min-w-[640px]">
+          <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-100">
+            {table.getHeaderGroups().map((hg) => (
+              <tr key={hg.id}>
+                {hg.headers.map((h) => (
+                  <th key={h.id} className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    {flexRender(h.column.columnDef.header, h.getContext())}
                   </th>
                 ))}
               </tr>
             ))}
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-gray-50">
             {loading && !tasks.length ? (
-               <tr><td colSpan={columns.length} className="text-center py-20 text-slate-400 animate-pulse">Loading tasks...</td></tr>
+              <tr>
+                <td colSpan={columns.length} className="text-center py-16 text-gray-400 text-sm animate-pulse">
+                  Loading tasks...
+                </td>
+              </tr>
             ) : table.getRowModel().rows.length === 0 ? (
-              <tr><td colSpan={columns.length} className="text-center py-20 text-slate-400 italic">No tasks found</td></tr>
+              <tr>
+                <td colSpan={columns.length} className="text-center py-16 text-gray-400 text-sm">
+                  No tasks found.
+                </td>
+              </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/80 transition-colors group">
+                <tr key={row.id} className="hover:bg-gray-50/60 transition-colors group">
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-6 py-3.5">
+                    <td key={cell.id} className="px-4 py-3">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -119,7 +138,11 @@ const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, han
           </tbody>
         </table>
       </div>
-      {error && <div className="p-4 bg-rose-50 text-rose-500 text-xs font-medium border-t border-rose-100">{error}</div>}
+      {error && (
+        <div className="px-4 py-2.5 bg-red-50 text-red-500 text-xs font-medium border-t border-red-100 flex-shrink-0">
+          {error}
+        </div>
+      )}
     </div>
   );
 };

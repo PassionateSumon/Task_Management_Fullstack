@@ -1,124 +1,293 @@
-import { db } from "../../../config/db.js";
 import { withTransaction } from "../../../common/utils/transaction.js";
+import type { StatusRepository } from "../../../infrastructure/persistence/status.repository.js";
+import type { TaskRepository } from "../../../infrastructure/persistence/task.repository.js";
+import type { UserRepository } from "../../../infrastructure/persistence/user.repository.js";
 
-export const createstatusService = async ({ name }: { name: string }) => {
-  try {
-    return await withTransaction(async (transaction) => {
-      const existed = await db.Status.findOne({ where: { name }, transaction });
-      if (existed) {
-        return {
-          statusCode: 409,
-          message: "Status already exists",
-          data: null,
-        };
-      }
+type StatusOpResult = {
+  statusCode: number;
+  message: string;
+  data: unknown;
+};
 
-      const result = await db.Status.create({ name }, { transaction });
-      if (!result) {
-        return {
+export class StatusService {
+  constructor(
+    private readonly status: StatusRepository,
+    private readonly tasks: TaskRepository,
+    private readonly users: UserRepository
+  ) {}
+
+  private async requireWorkspaceId(
+    userId: number,
+    transaction?: import("sequelize").Transaction
+  ) {
+    const wid = await this.users.findWorkspaceIdByUserId(userId, transaction);
+    if (wid == null) {
+      return {
+        error: {
           statusCode: 400,
-          message: "Status creation failed",
+          message: "No workspace assigned to this user",
           data: null,
-        };
-      }
-      return {
-        statusCode: 200,
-        message: "Status created successfully",
-        data: result,
-      };
-    });
-  } catch (err: any) {
-    return {
-      statusCode: 500,
-      message: "Internal server error",
-      data: null,
-    };
+        },
+      } as const;
+    }
+    return { workspaceId: wid } as const;
   }
-};
 
-export const getAllStatusService = async () => {
-  try {
-    const result = await withTransaction(async (transaction) => {
-      return db.Status.findAll({ attributes: ["id", "name"], transaction });
-    });
-    return {
-      statusCode: 200,
-      message: "Status fetched successfully",
-      data: result,
-    };
-  } catch (err: any) {
-    return {
-      statusCode: 500,
-      message: "Internal server error",
-      data: null,
-    };
-  }
-};
+  async createStatus(
+    userId: number,
+    params: { name: string; is_final?: boolean }
+  ): Promise<StatusOpResult> {
+    const { name, is_final = false } = params;
+    try {
+      return (await withTransaction(async (transaction) => {
+        const ws = await this.requireWorkspaceId(userId, transaction);
+        if ("error" in ws) return ws.error;
 
-export const updateStatusService = async ({
-  id,
-  name,
-}: {
-  id: number;
-  name: string;
-}) => {
-  try {
-    return await withTransaction(async (transaction) => {
-      const result = await db.Status.findOne({
-        where: { id },
-        attributes: ["id", "name"],
-        transaction,
-      });
-      if (!result) {
+        const existed = await this.status.findOneByNameInWorkspace(
+          name,
+          ws.workspaceId,
+          transaction
+        );
+        if (existed) {
+          return {
+            statusCode: 409,
+            message: "Status already exists in this workspace",
+            data: null,
+          };
+        }
+
+        if (is_final) {
+          const prevFinal = await this.status.findFinalInWorkspace(
+            ws.workspaceId,
+            transaction
+          );
+          if (prevFinal) {
+            await this.tasks.nullCompletedDateForTasksInStatus(
+              prevFinal.id,
+              transaction
+            );
+          }
+          await this.status.clearIsFinalInWorkspace(
+            ws.workspaceId,
+            null,
+            transaction
+          );
+        }
+
+        const result = await this.status.createRow(
+          {
+            name,
+            workspace_id: ws.workspaceId,
+            is_system: false,
+            is_final: Boolean(is_final),
+          },
+          transaction
+        );
+        if (!result) {
+          return {
+            statusCode: 400,
+            message: "Status creation failed",
+            data: null,
+          };
+        }
         return {
-          statusCode: 404,
-          message: "Status not found",
-          data: null,
+          statusCode: 200,
+          message: "Status created successfully",
+          data: result,
         };
-      }
-      await db.Status.update({ name }, { where: { id }, transaction });
-      const finalRes = await db.Status.findOne({ where: { id }, transaction });
+      })) as StatusOpResult;
+    } catch {
       return {
-        statusCode: 200,
-        message: "Status updated successfully",
-        data: finalRes,
+        statusCode: 500,
+        message: "Internal server error",
+        data: null,
       };
-    });
-  } catch (err: any) {
-    return {
-      statusCode: 500,
-      message: err.message || "Internal server error",
-      data: null,
-    };
+    }
   }
-};
 
-export const deleteStatusService = async ({id}: { id: number }) => {
-  try {
-    return await withTransaction(async (transaction) => {
-      const result = await db.Status.findOne({ where: { id }, transaction });
-      if (!result) {
+  async getAllStatuses(userId: number): Promise<StatusOpResult> {
+    try {
+      return (await withTransaction(async (transaction) => {
+        const ws = await this.requireWorkspaceId(userId, transaction);
+        if ("error" in ws) return ws.error;
+
+        const result = await this.status.findAllForWorkspace(
+          ws.workspaceId,
+          transaction
+        );
         return {
-          statusCode: 404,
-          message: "Status not found",
-          data: null,
+          statusCode: 200,
+          message: "Status fetched successfully",
+          data: result,
         };
-      }
-
-      await db.Task.destroy({ where: { status_id: id }, transaction });
-      await db.Status.destroy({ where: { id }, transaction });
-
+      })) as StatusOpResult;
+    } catch {
       return {
-        statusCode: 200,
-        message: "Status deleted successfully",
-        data: { id: id },
+        statusCode: 500,
+        message: "Internal server error",
+        data: null,
       };
-    });
-  } catch (err: any) {
-    return {
-      statusCode: 500,
-      message: err.message || "Internal server error",
-      data: null,
-    };
+    }
   }
-};
+
+  async updateStatus(
+    userId: number,
+    params: { id: number; name: string; is_final?: boolean }
+  ): Promise<StatusOpResult> {
+    const { id, name, is_final } = params;
+    try {
+      return (await withTransaction(async (transaction) => {
+        const ws = await this.requireWorkspaceId(userId, transaction);
+        if ("error" in ws) return ws.error;
+
+        const row = await this.status.findOneRaw(id, transaction);
+        if (!row || row.workspace_id !== ws.workspaceId) {
+          return {
+            statusCode: 404,
+            message: "Status not found",
+            data: null,
+          };
+        }
+
+        if (row.is_system && name !== row.name) {
+          return {
+            statusCode: 403,
+            message: "System status name cannot be changed",
+            data: null,
+          };
+        }
+
+        const nameTaken = await this.status.findOneByNameInWorkspace(
+          name,
+          ws.workspaceId,
+          transaction
+        );
+        if (nameTaken && nameTaken.id !== id) {
+          return {
+            statusCode: 409,
+            message: "Status name already exists in this workspace",
+            data: null,
+          };
+        }
+
+        const wantFinal =
+          is_final === undefined ? Boolean(row.is_final) : Boolean(is_final);
+
+        if (wantFinal) {
+          const prevFinal = await this.status.findFinalInWorkspace(
+            ws.workspaceId,
+            transaction
+          );
+          if (prevFinal && prevFinal.id !== id) {
+            await this.tasks.nullCompletedDateForTasksInStatus(
+              prevFinal.id,
+              transaction
+            );
+            await this.status.clearIsFinalInWorkspace(
+              ws.workspaceId,
+              null,
+              transaction
+            );
+          } else {
+            await this.status.clearIsFinalInWorkspace(
+              ws.workspaceId,
+              id,
+              transaction
+            );
+          }
+          await this.status.updateFields(
+            id,
+            { name, is_final: true },
+            transaction
+          );
+        } else {
+          if (row.is_final) {
+            await this.tasks.nullCompletedDateForTasksInStatus(id, transaction);
+          }
+          await this.status.updateFields(
+            id,
+            {
+              name,
+              is_final: false,
+            },
+            transaction
+          );
+        }
+
+        const finalRes = await this.status.findOneAfterUpdate(id, transaction);
+        return {
+          statusCode: 200,
+          message: "Status updated successfully",
+          data: finalRes,
+        };
+      })) as StatusOpResult;
+    } catch (err: any) {
+      return {
+        statusCode: 500,
+        message: err.message || "Internal server error",
+        data: null,
+      };
+    }
+  }
+
+  async deleteStatus(userId: number, params: { id: number; new_final_id?: number }): Promise<StatusOpResult> {
+    const { id, new_final_id } = params;
+    try {
+      return (await withTransaction(async (transaction) => {
+        const ws = await this.requireWorkspaceId(userId, transaction);
+        if ("error" in ws) return ws.error;
+
+        const result = await this.status.findOneRaw(id, transaction);
+        if (!result || result.workspace_id !== ws.workspaceId) {
+          return {
+            statusCode: 404,
+            message: "Status not found",
+            data: null,
+          };
+        }
+
+        if (result.is_system) {
+          return {
+            statusCode: 403,
+            message: "System statuses cannot be deleted",
+            data: null,
+          };
+        }
+
+        if (result.is_final) {
+          if (!new_final_id) {
+            return {
+              statusCode: 400,
+              message: "Please select another status to be the new final status",
+              data: null,
+            };
+          }
+          const newFinal = await this.status.findOneRaw(new_final_id, transaction);
+          if (!newFinal || newFinal.workspace_id !== ws.workspaceId) {
+            return {
+              statusCode: 404,
+              message: "New final status not found",
+              data: null,
+            };
+          }
+          await this.status.updateFields(new_final_id, { is_final: true }, transaction);
+        }
+
+        await this.tasks.deleteTasksByStatusId(id, transaction);
+        await this.status.destroyById(id, transaction);
+
+        return {
+          statusCode: 200,
+          message: "Status deleted successfully",
+          data: { id: id },
+        };
+      })) as StatusOpResult;
+    } catch (err: any) {
+      return {
+        statusCode: 500,
+        message: err.message || "Internal server error",
+        data: null,
+      };
+    }
+  }
+}
