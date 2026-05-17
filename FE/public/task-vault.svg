@@ -1,0 +1,30 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 64 64"
+  width="64"
+  height="64"
+  fill="none"
+>
+  <!-- Background -->
+  <rect width="64" height="64" rx="14" fill="#6366F1" />
+
+  <!-- Shield -->
+  <path
+    d="M32 10L50 17V32C50 43.5 39.5 51 32 54C24.5 51 14 43.5 14 32V17L32 10Z"
+    fill="rgba(255,255,255,0.08)"
+    stroke="white"
+    stroke-width="2.5"
+    stroke-linejoin="round"
+  />
+
+  <!-- TV Text -->
+  <g
+    fill="white"
+    font-family="Inter, Arial, sans-serif"
+    font-size="15"
+    font-weight="700"
+    text-anchor="middle"
+  >
+    <text x="32" y="36">TV</text>
+  </g>
+</svg>
