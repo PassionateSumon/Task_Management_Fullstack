@@ -11,7 +11,7 @@ export const createStatusHandler = async (req: Request, h: ResponseToolkit) => {
       name: string;
       is_final?: boolean;
     };
-    const result = await status().createStatus(String(userId), payload);
+    const result = await status().createStatus(userId, payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status created successfully", 200)(h);
@@ -23,7 +23,7 @@ export const createStatusHandler = async (req: Request, h: ResponseToolkit) => {
 export const getAllStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const { userId } = req.auth.credentials as any;
-    const result = await status().getAllStatuses(String(userId));
+    const result = await status().getAllStatuses(userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status fetched successfully", 200)(h);
@@ -40,7 +40,7 @@ export const updateStatusHandler = async (req: Request, h: ResponseToolkit) => {
       name: string;
       is_final?: boolean;
     };
-    const result = await status().updateStatus(String(userId), payload);
+    const result = await status().updateStatus(userId, payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status updated successfully", 200)(h);
@@ -53,7 +53,7 @@ export const deleteStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const { userId } = req.auth.credentials as any;
     const payload = req.payload as { id: number; new_final_id?: number };
-    const result = await status().deleteStatus(String(userId), payload);
+    const result = await status().deleteStatus(userId, payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status deleted successfully", 200)(h);
