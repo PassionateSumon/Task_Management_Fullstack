@@ -7,7 +7,8 @@ const users = () => getAppContainer().userService;
 export const getAllUsersHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const { userId } = req.auth.credentials as any;
-    const result = await users().getAllUsers(userId);
+    const { page, limit, search } = req.query as any;
+    const result = await users().getAllUsers(userId, { page, limit, search });
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Users fetched successfully", 200)(h);

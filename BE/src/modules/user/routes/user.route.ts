@@ -9,6 +9,7 @@ import { JWTUtil } from "../../../common/utils/JWTUtils.js";
 import {
   userUpdateNamePayloadSchema,
   userIdParamSchema,
+  userGetAllParamSchema,
 } from "../validation/user.validation.js";
 
 const prefix = "/user";
@@ -22,6 +23,9 @@ export default [
       tags: ["api", "user"],
       description: "Get all users",
       plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
+      validate: {
+        query: userGetAllParamSchema,
+      },
     },
   },
   {

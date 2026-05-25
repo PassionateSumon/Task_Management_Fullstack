@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useReactTable, getCoreRowModel, flexRender, type ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
-import { Calendar, FileText, Trash2, Edit2 } from "lucide-react";
+import { Calendar, FileText, Trash2, Edit2, ArrowDownAZ, ArrowUpZA, ArrowUpDown } from "lucide-react";
 import type { TableViewProps } from "../types/Task.interface";
 
 const priorityConfig: Record<string, string> = {
@@ -10,7 +10,13 @@ const priorityConfig: Record<string, string> = {
   low: "bg-green-50 text-green-700",
 };
 
-const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, handleEditTask, handleDeleteTask }: TableViewProps) => {
+interface ExtendedTableViewProps extends TableViewProps {
+  sortBy?: string;
+  sortOrder?: "ASC" | "DESC" | "asc" | "desc";
+  onSort?: (field: string) => void;
+}
+
+const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, handleEditTask, handleDeleteTask, sortBy, sortOrder, onSort }: ExtendedTableViewProps) => {
 
   const columns = useMemo<ColumnDef<any>[]>(() => [
     {
@@ -96,6 +102,13 @@ const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, han
 
   const table = useReactTable({ data: tasks || [], columns, getCoreRowModel: getCoreRowModel() });
 
+  const renderSortIcon = (field: string) => {
+    if (sortBy !== field) return <ArrowUpDown size={12} className="text-gray-300 ml-1 inline" />;
+    return sortOrder?.toUpperCase() === "ASC" ? 
+      <ArrowUpZA size={12} className="text-[#5A67D8] ml-1 inline" /> : 
+      <ArrowDownAZ size={12} className="text-[#5A67D8] ml-1 inline" />;
+  };
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm h-full flex flex-col overflow-hidden">
       <div className="flex-1 overflow-auto thin-scrollbar">
@@ -103,11 +116,24 @@ const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, han
           <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-100">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
-                {hg.headers.map((h) => (
-                  <th key={h.id} className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                    {flexRender(h.column.columnDef.header, h.getContext())}
-                  </th>
-                ))}
+                {hg.headers.map((h) => {
+                  const isSortable = h.column.id === "task_name" || h.column.id === "end_date";
+                  return (
+                    <th key={h.id} className="px-4 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      <div 
+                        className={`flex items-center ${isSortable ? 'cursor-pointer select-none hover:text-gray-600' : ''}`}
+                        onClick={() => {
+                          if (isSortable && onSort) {
+                            onSort(h.column.id);
+                          }
+                        }}
+                      >
+                        {flexRender(h.column.columnDef.header, h.getContext())}
+                        {isSortable && renderSortIcon(h.column.id)}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             ))}
           </thead>

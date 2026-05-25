@@ -19,7 +19,7 @@ const requiredEnvVars = [
   process.env.NODE_ENV === "production" ? "PROD_ORIGIN" : "DEV_ORIGIN",
 ];
 const missingEnvVars = requiredEnvVars.filter(
-  (varName) => !process.env[varName]
+  (varName) => !process.env[varName],
 );
 if (missingEnvVars.length > 0) {
   console.error(`Missing environment variables: ${missingEnvVars.join(", ")}`);
@@ -68,11 +68,13 @@ const init = async () => {
   await server.register(Jwt);
   await server.register(Cookie);
 
-  const SWAGGER_PATHS = ['/documentation', '/swagger.json', '/swaggerui/'];
-  server.ext('onRequest', (request, h) => {
+  const SWAGGER_PATHS = ["/documentation", "/swagger.json", "/swaggerui/"];
+  server.ext("onRequest", (request, h) => {
     const path = request.path;
-    const isSwaggerRequest = SWAGGER_PATHS.some((p) => path === p || path.startsWith(p));
-    
+    const isSwaggerRequest = SWAGGER_PATHS.some(
+      (p) => path === p || path.startsWith(p),
+    );
+
     if (!isSwaggerRequest) return h.continue;
 
     const swaggerUser = process.env.SWAGGER_USER;
@@ -81,21 +83,25 @@ const init = async () => {
     if (!swaggerUser || !swaggerPass) return h.continue;
 
     const authorization = request.headers.authorization;
-    if (!authorization || !authorization.startsWith('Basic ')) {
-      return h.response('Authentication required')
+    if (!authorization || !authorization.startsWith("Basic ")) {
+      return h
+        .response("Authentication required")
         .code(401)
-        .header('WWW-Authenticate', 'Basic realm="API Documentation"')
+        .header("WWW-Authenticate", 'Basic realm="API Documentation"')
         .takeover();
     }
 
-    const base64Credentials = authorization.split(' ')[1];
-    const credentials = Buffer.from(base64Credentials, 'base64').toString('utf8');
-    const [user, pass] = credentials.split(':');
+    const base64Credentials = authorization.split(" ")[1];
+    const credentials = Buffer.from(base64Credentials, "base64").toString(
+      "utf8",
+    );
+    const [user, pass] = credentials.split(":");
 
     if (user !== swaggerUser || pass !== swaggerPass) {
-      return h.response('Invalid credentials')
+      return h
+        .response("Invalid credentials")
         .code(401)
-        .header('WWW-Authenticate', 'Basic realm="API Documentation"')
+        .header("WWW-Authenticate", 'Basic realm="API Documentation"')
         .takeover();
     }
     return h.continue;
@@ -106,7 +112,7 @@ const init = async () => {
   const container = getAppContainer();
   const cookieAuth = new CookieAuthValidators(
     container.userRepository,
-    container.refreshTokenRepository
+    container.refreshTokenRepository,
   );
 
   server.auth.strategy("jwt_access", "cookie", {
@@ -139,10 +145,14 @@ const init = async () => {
   server.auth.default("jwt_access");
 
   server.events.on("response", function (req: Request) {
+    const duration = req.info.responded - req.info.received;
+    const fullPath = `${baseUrl}${req.path}`;
+
     console.log(
-      `${req.info.remoteAddress}: ${req.method.toUpperCase()} ${req.path} --> ${
-        (req.response as any).statusCode
-      }`
+      req.method.toUpperCase() + "- " +
+      fullPath + " --> " +
+      (req.response as any).statusCode + " (" +
+      `${duration}ms` + ")"
     );
   });
 
@@ -151,9 +161,7 @@ const init = async () => {
     await server.register(routesPlugin);
     await server.start();
     console.log(`Server is running on ${server.info.uri}`);
-    console.log(
-      `Swagger is running on ${baseUrl}/documentation`
-    );
+    console.log(`Swagger is running on ${baseUrl}/documentation`);
   } catch (error) {
     console.error("Unable to connect to the database or start server:", error);
     process.exit(1);

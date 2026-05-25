@@ -105,7 +105,7 @@ export class StatusService {
     }
   }
 
-  async getAllStatuses(userId: number): Promise<StatusOpResult> {
+  async getAllStatuses(userId: number, options?: { search?: string }): Promise<StatusOpResult> {
     try {
       return (await withTransaction(async (transaction) => {
         const ws = await this.requireWorkspaceId(userId, transaction);
@@ -113,6 +113,7 @@ export class StatusService {
 
         const result = await this.status.findAllForWorkspace(
           ws.workspaceId,
+          options,
           transaction
         );
         return {

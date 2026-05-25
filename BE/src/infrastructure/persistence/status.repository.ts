@@ -54,10 +54,17 @@ export class StatusRepository implements IStatusReader {
 
   async findAllForWorkspace(
     workspaceId: number,
+    options?: { search?: string },
     transaction?: Transaction
   ) {
+    const where: any = { workspace_id: workspaceId };
+    
+    if (options?.search) {
+      where.name = { [Op.like]: `%${options.search}%` };
+    }
+
     return this.db.Status.findAll({
-      where: { workspace_id: workspaceId },
+      where,
       attributes: ["id", "name", "workspace_id", "is_system", "is_final"],
       order: [["id", "ASC"]],
       transaction,

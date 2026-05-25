@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { createTask, getAllTasks, updateTask } from "../slices/TaskSlice";
+import { createTask, refetchTasks, updateTask } from "../slices/TaskSlice";
 import type { AppDispatch, RootState } from "../../../store/store";
 import { toast } from "react-toastify";
 import type { ExtendedTaskModalProps } from "../types/Task.interface";
@@ -13,7 +13,7 @@ import {
 import "ckeditor5/ckeditor5.css";
 
 const TaskModal = ({
-  isOpen, onClose, mode, task, statuses, activeView,
+  isOpen, onClose, mode, task, statuses,
   handleEditTask, handleDeleteTask,
 }: ExtendedTaskModalProps) => {
   const [formData, setFormData] = useState({
@@ -69,7 +69,6 @@ const TaskModal = ({
       start_date: formData.start_date || undefined,
       end_date: formData.end_date || undefined,
     };
-    const viewType = activeView === "collapsed" ? "compact" : activeView;
     if (mode === "add") {
       const result = await dispatch(createTask(payload));
       if (createTask.fulfilled.match(result)) { 
@@ -83,7 +82,7 @@ const TaskModal = ({
     }
     setFormData({ name: "", description: "", status: "", priority: "", start_date: "", end_date: "" });
     onClose(); 
-    dispatch(getAllTasks({ viewType })); 
+    dispatch(refetchTasks()); 
   };
 
   if (!isOpen) return null;

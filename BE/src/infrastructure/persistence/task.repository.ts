@@ -9,7 +9,7 @@ export class TaskRepository implements ITaskWriter {
 
   async deleteTasksByStatusId(
     statusId: number,
-    transaction: Transaction
+    transaction: Transaction,
   ): Promise<void> {
     await this.db.Task.destroy({
       where: { status_id: statusId },
@@ -23,7 +23,7 @@ export class TaskRepository implements ITaskWriter {
       status_id: unknown;
       user_id: number;
     },
-    transaction?: Transaction
+    transaction?: Transaction,
   ) {
     return this.db.Task.findOne({
       where: params,
@@ -37,10 +37,58 @@ export class TaskRepository implements ITaskWriter {
 
   async findAllForUser(
     userKey: number | string | null | undefined,
-    transaction?: Transaction
+    options?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      status?: string;
+      priority?: string;
+      start_date?: Date;
+      end_date?: Date;
+      sortBy?: string;
+      sortOrder?: string;
+    },
+    transaction?: Transaction,
   ) {
-    return this.db.Task.findAll({
-      where: { user_id: userKey },
+    const where: any = {};
+
+    if (userKey) {
+      where.user_id = userKey;
+    }
+
+    if (options?.search) {
+      where.task_name = { [Op.like]: `%${options.search}%` };
+    }
+    if (options?.priority) {
+      where.priority = options.priority;
+    }
+    if (options?.start_date) {
+      where.start_date = { [Op.eq]: options.start_date };
+    }
+    if (options?.end_date) {
+      where.end_date = { [Op.eq]: options.end_date };
+    }
+
+    let statusInclude: any = {
+      model: this.db.Status,
+      as: "status",
+      attributes: ["id", "name", "is_final", "is_system"],
+    };
+
+    if (options?.status) {
+      statusInclude.where = { name: options.status };
+    }
+
+    let order: any = [["createdAt", "DESC"]];
+    if (options?.sortBy && options?.sortOrder) {
+      const validSortFields = ["task_name", "end_date"];
+      if (validSortFields.includes(options.sortBy)) {
+        order = [[options.sortBy, options.sortOrder]];
+      }
+    }
+
+    const queryOptions: any = {
+      where,
       attributes: [
         "id",
         "task_name",
@@ -52,15 +100,17 @@ export class TaskRepository implements ITaskWriter {
         "completed_date",
         "user_id",
       ],
-      include: [
-        {
-          model: this.db.Status,
-          as: "status",
-          attributes: ["id", "name", "is_final", "is_system"],
-        },
-      ],
+      include: [statusInclude],
       transaction,
-    });
+      order,
+    };
+
+    if (options && options?.limit && options?.page) {
+      queryOptions.limit = options.limit;
+      queryOptions.offset = (options.page - 1) * options.limit;
+    }
+
+    return this.db.Task.findAndCountAll(queryOptions);
   }
 
   async findOneWithStatus(id: number, transaction?: Transaction) {
@@ -98,7 +148,7 @@ export class TaskRepository implements ITaskWriter {
   async updateById(
     id: number,
     data: Record<string, unknown>,
-    transaction?: Transaction
+    transaction?: Transaction,
   ) {
     return this.db.Task.update(data, { where: { id }, transaction });
   }
@@ -123,11 +173,11 @@ export class TaskRepository implements ITaskWriter {
 
   async nullCompletedDateForTasksInStatus(
     statusId: number,
-    transaction?: Transaction
+    transaction?: Transaction,
   ): Promise<void> {
     await this.db.Task.update(
       { completed_date: null },
-      { where: { status_id: statusId }, transaction }
+      { where: { status_id: statusId }, transaction },
     );
   }
 
@@ -144,7 +194,7 @@ export class TaskRepository implements ITaskWriter {
           attributes: [],
         },
       ],
-      transaction
+      transaction,
     });
   }
 
@@ -174,7 +224,11 @@ export class TaskRepository implements ITaskWriter {
     });
   }
 
-  async countOverdue(currentDate: Date, workspaceId: number | null, transaction?: Transaction) {
+  async countOverdue(
+    currentDate: Date,
+    workspaceId: number | null,
+    transaction?: Transaction,
+  ) {
     return this.db.Task.count({
       where: { end_date: { [Op.lt]: currentDate } },
       include: [
@@ -203,7 +257,10 @@ export class TaskRepository implements ITaskWriter {
     });
   }
 
-  async findRecentWithUserAndStatus(workspaceId: number | null, transaction?: Transaction) {
+  async findRecentWithUserAndStatus(
+    workspaceId: number | null,
+    transaction?: Transaction,
+  ) {
     return this.db.Task.findAll({
       attributes: [
         "id",
@@ -227,7 +284,7 @@ export class TaskRepository implements ITaskWriter {
         {
           model: this.db.Status,
           as: "status",
-          attributes: ["id", "name"]
+          attributes: ["id", "name"],
         },
       ],
       order: [[this.db.sequelize.literal("`Task`.`createdAt`"), "DESC"]],
@@ -238,7 +295,10 @@ export class TaskRepository implements ITaskWriter {
     });
   }
 
-  async findGroupedByPriority(workspaceId: number | null, transaction?: Transaction) {
+  async findGroupedByPriority(
+    workspaceId: number | null,
+    transaction?: Transaction,
+  ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
       attributes: ["priority", [sequelize.literal("COUNT(*)"), "count"]],
@@ -261,7 +321,7 @@ export class TaskRepository implements ITaskWriter {
   async findMonthlyTasks(
     currentYear: number,
     workspaceId: number | null,
-    transaction?: Transaction
+    transaction?: Transaction,
   ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
@@ -275,15 +335,7 @@ export class TaskRepository implements ITaskWriter {
       where: {
         createdAt: {
           [Op.gte]: new Date(currentYear, 0, 1),
-          [Op.lte]: new Date(
-            currentYear,
-            11,
-            31,
-            23,
-            59,
-            59,
-            999
-          ),
+          [Op.lte]: new Date(currentYear, 11, 31, 23, 59, 59, 999),
         },
       },
       include: [
@@ -296,7 +348,9 @@ export class TaskRepository implements ITaskWriter {
           attributes: [],
         },
       ],
-      group: [sequelize.fn("DATE_FORMAT", sequelize.col("Task.createdAt"), "%Y-%m")],
+      group: [
+        sequelize.fn("DATE_FORMAT", sequelize.col("Task.createdAt"), "%Y-%m"),
+      ],
       raw: true,
       transaction,
     });
@@ -306,7 +360,7 @@ export class TaskRepository implements ITaskWriter {
     currentYear: number,
     currentMonth: number,
     workspaceId: number | null,
-    transaction?: Transaction
+    transaction?: Transaction,
   ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
@@ -318,15 +372,7 @@ export class TaskRepository implements ITaskWriter {
       where: {
         createdAt: {
           [Op.gte]: new Date(currentYear, currentMonth, 1),
-          [Op.lte]: new Date(
-            currentYear,
-            currentMonth + 1,
-            0,
-            23,
-            59,
-            59,
-            999
-          ),
+          [Op.lte]: new Date(currentYear, currentMonth + 1, 0, 23, 59, 59, 999),
         },
       },
       include: [
@@ -352,7 +398,10 @@ export class TaskRepository implements ITaskWriter {
     });
   }
 
-  async findYearlyByStartDate(workspaceId: number | null, transaction?: Transaction) {
+  async findYearlyByStartDate(
+    workspaceId: number | null,
+    transaction?: Transaction,
+  ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
       attributes: [
@@ -378,7 +427,10 @@ export class TaskRepository implements ITaskWriter {
     });
   }
 
-  async findTasksPerUser(workspaceId: number | null, transaction?: Transaction) {
+  async findTasksPerUser(
+    workspaceId: number | null,
+    transaction?: Transaction,
+  ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
       attributes: [
@@ -403,7 +455,10 @@ export class TaskRepository implements ITaskWriter {
     });
   }
 
-  async findAvgDurationCompleted(workspaceId: number | null, transaction?: Transaction) {
+  async findAvgDurationCompleted(
+    workspaceId: number | null,
+    transaction?: Transaction,
+  ) {
     const { sequelize } = this.db;
     return this.db.Task.findOne({
       attributes: [
@@ -414,8 +469,8 @@ export class TaskRepository implements ITaskWriter {
               "TIMESTAMPDIFF",
               sequelize.literal("DAY"),
               sequelize.col("start_date"),
-              sequelize.col("end_date")
-            )
+              sequelize.col("end_date"),
+            ),
           ),
           "avgDurationDays",
         ],
@@ -450,7 +505,11 @@ export class TaskRepository implements ITaskWriter {
     });
   }
 
-  async findStatusTrends(thirtyDaysAgo: Date, workspaceId: number | null, transaction?: Transaction) {
+  async findStatusTrends(
+    thirtyDaysAgo: Date,
+    workspaceId: number | null,
+    transaction?: Transaction,
+  ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
       attributes: [
@@ -512,7 +571,7 @@ export class TaskRepository implements ITaskWriter {
 
   async findGroupedByPriorityForUser(
     userId: number,
-    transaction?: Transaction
+    transaction?: Transaction,
   ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
