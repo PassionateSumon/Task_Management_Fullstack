@@ -27,9 +27,41 @@ export const createTaskHandler = async (req: Request, h: ResponseToolkit) => {
 export const getAllTaskHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const { userId, roleId } = req.auth.credentials as any;
-    const viewType = req.query.viewType as "kanban" | "compact" | "calendar" | "table";
+    const viewType = req.query.viewType as
+      | "kanban"
+      | "compact"
+      | "calendar"
+      | "table";
     const reqUserId = req.query.id as string | null;
-    const result = await task().getAllTasks(viewType, userId, roleId, reqUserId);
+    const {
+      page,
+      limit,
+      search,
+      status,
+      priority,
+      start_date,
+      end_date,
+      sortBy,
+      sortOrder,
+    } = req.query as any;
+
+    const result = await task().getAllTasks(
+      viewType,
+      userId,
+      roleId,
+      reqUserId,
+      {
+        page,
+        limit,
+        search,
+        status,
+        priority,
+        start_date,
+        end_date,
+        sortBy,
+        sortOrder,
+      },
+    );
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Tasks fetched successfully", 200)(h);
@@ -40,7 +72,7 @@ export const getAllTaskHandler = async (req: Request, h: ResponseToolkit) => {
 
 export const getSingleTaskHandler = async (
   req: Request,
-  h: ResponseToolkit
+  h: ResponseToolkit,
 ) => {
   try {
     const id = req.params.id as number;

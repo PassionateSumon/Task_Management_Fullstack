@@ -15,3 +15,7 @@ export const deleteStatusPayloadSchema = Joi.object({
   id: Joi.number().integer().positive().required(),
   new_final_id: Joi.number().integer().positive().optional(),
 });
+
+export const statusGetAllParamSchema = Joi.object({
+  search: Joi.string().allow("", null),
+});

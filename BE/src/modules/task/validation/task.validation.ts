@@ -37,5 +37,14 @@ export const taskIdParamSchema = Joi.object({
 
 export const taskGetAllParamSchema = Joi.object({
   viewType: Joi.string().valid("kanban", "compact", "calendar", "table").required(),
-  id: Joi.string().allow(null),
+  id: Joi.string().allow(null, ""),
+  page: Joi.number().integer().min(1).default(1),
+  limit: Joi.number().integer().min(1).default(10),
+  search: Joi.string().allow("", null),
+  status: Joi.string().allow("", null),
+  priority: Joi.string().allow("", null),
+  start_date: Joi.date().allow(null),
+  end_date: Joi.date().allow(null),
+  sortBy: Joi.string().valid("task_name", "end_date").allow("", null),
+  sortOrder: Joi.string().valid("ASC", "DESC", "asc", "desc").allow("", null),
 });

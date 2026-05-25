@@ -8,6 +8,7 @@ import {
   createStatusPayloadSchema,
   deleteStatusPayloadSchema,
   updateStatusPayloadSchema,
+  statusGetAllParamSchema,
 } from "../validation/status.validation.js";
 
 const prefix = "/status";
@@ -40,6 +41,9 @@ export default [
       tags: ["api", "status"],
       description: "Get all status",
       plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
+      validate: {
+        query: statusGetAllParamSchema,
+      },
     },
   },
   {

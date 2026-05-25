@@ -23,7 +23,8 @@ export const createStatusHandler = async (req: Request, h: ResponseToolkit) => {
 export const getAllStatusHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const { userId } = req.auth.credentials as any;
-    const result = await status().getAllStatuses(userId);
+    const { search } = req.query as any;
+    const result = await status().getAllStatuses(userId, { search });
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Status fetched successfully", 200)(h);

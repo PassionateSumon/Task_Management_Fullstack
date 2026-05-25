@@ -55,15 +55,33 @@ export class UserRepository {
 
   async findAllExceptUserId(
     userId: number,
+    options?: { page?: number; limit?: number; search?: string },
     transaction?: Transaction
-  ): Promise<any[]> {
-    return this.db.User.findAll({
+  ) {
+    const where: any = {
+      id: { [Op.ne]: userId },
+    };
+
+    if (options?.search) {
+      where[Op.or] = [
+        { name: { [Op.like]: `%${options.search}%` } },
+        { email: { [Op.like]: `%${options.search}%` } },
+      ];
+    }
+
+    const queryOptions: any = {
       attributes: { exclude: ["password"] },
-      where: {
-        id: { [Op.ne]: userId },
-      },
+      where,
       transaction,
-    });
+      order: [["createdAt", "DESC"]],
+    };
+
+    if (options?.limit && options?.page) {
+      queryOptions.limit = options.limit;
+      queryOptions.offset = (options.page - 1) * options.limit;
+    }
+
+    return this.db.User.findAndCountAll(queryOptions);
   }
 
   async findOneByIdExcludePassword(

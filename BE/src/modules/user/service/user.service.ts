@@ -4,10 +4,10 @@ import type { UserRepository } from "../../../infrastructure/persistence/user.re
 export class UserService {
   constructor(private readonly users: UserRepository) {}
 
-  async getAllUsers(userId: number) {
+  async getAllUsers(userId: number, options?: { page?: number; limit?: number; search?: string }) {
     try {
-      const users = await withTransaction(async (transaction) => {
-        return this.users.findAllExceptUserId(userId, transaction);
+      const { rows: users, count } = await withTransaction(async (transaction) => {
+        return this.users.findAllExceptUserId(userId, options, transaction);
       });
       if (!users) {
         return {
@@ -16,10 +16,21 @@ export class UserService {
           data: null,
         };
       }
+      
+      const meta = options?.page && options?.limit ? {
+        totalItems: count,
+        totalPages: Math.ceil(count / options.limit),
+        currentPage: options.page,
+        limit: options.limit
+      } : undefined;
+
       return {
         statusCode: 200,
         message: "Users fetched successfully",
-        data: users,
+        data: {
+          data: users,
+          meta
+        },
       };
     } catch (err: any) {
       return {
