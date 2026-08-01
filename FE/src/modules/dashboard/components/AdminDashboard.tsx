@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "../../../store/store";
 import { getDashboardData, toggleStatus } from "../slices/dashboardSlice";
@@ -13,10 +13,65 @@ import {
   Cell,
   ResponsiveContainer,
   Legend,
+  LineChart,
+  Line,
+  CartesianGrid,
 } from "recharts";
 import { DotLoader } from "react-spinners";
 
-const COLORS = ["#5A67D8", "#38B2AC", "#E53E3E"];
+const PRIORITY_COLORS = ["#E53E3E", "#ED8936", "#48BB78", "#A0AEC0"];
+
+const normalizePriority = (p: string | null) => {
+  if (!p) return null;
+  return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+};
+
+const StatCard = ({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  accent: string;
+}) => (
+  <div
+    className="bg-white rounded-xl shadow-sm p-4 border-l-4 flex flex-col gap-1"
+    style={{ borderLeftColor: accent }}
+  >
+    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+      {label}
+    </p>
+    <p className="text-2xl font-bold text-gray-800">{value}</p>
+  </div>
+);
+
+const SectionCard = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) => (
+  <div className="bg-white rounded-xl shadow-sm p-4">
+    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+      {title}
+    </h2>
+    {children}
+  </div>
+);
+
+const CustomBarTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white border border-gray-100 shadow-lg rounded-lg px-3 py-2 text-sm">
+        <p className="font-semibold text-gray-700">{label}</p>
+        <p className="text-[#5A67D8]">Count: {payload[0].value}</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 const AdminDashboard = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -30,11 +85,12 @@ const AdminDashboard = () => {
   }, [dispatch]);
 
   const tabClasses = (tab: string) =>
-    `py-2 px-4 rounded-lg font-semibold flex items-center gap-2 transition-all cursor-pointer
-     ${activeTab === tab
-      ? "bg-[#434190] text-white shadow-md scale-105"
-      : "bg-[#5A67D8] hover:bg-[#434190] text-white"
-    }`;
+    `py-1.5 px-5 rounded-lg font-semibold text-sm flex items-center gap-2 transition-all cursor-pointer
+     ${
+       activeTab === tab
+         ? "bg-[#434190] text-white shadow-md"
+         : "bg-white text-[#434190] border border-[#5A67D8] hover:bg-[#EEF2FF]"
+     }`;
 
   const handleToggleUserStatus = (userId: number) => {
     dispatch(toggleStatus(userId));
@@ -48,291 +104,361 @@ const AdminDashboard = () => {
       />
     );
 
-  return (
-    <div className="bg-[#F3F4FE] h-[94vh] overflow-y-auto thin-scrollbar p-6 text-[#2D3748] cursor-pointer ">
-      <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
+  const priorityPieData = [
+    { name: "High", value: dashboardData?.tasksByPriority?.high ?? 0 },
+    { name: "Medium", value: dashboardData?.tasksByPriority?.medium ?? 0 },
+    { name: "Low", value: dashboardData?.tasksByPriority?.low ?? 0 },
+    { name: "No Priority", value: dashboardData?.tasksByPriority?.null ?? 0 },
+  ].filter((d) => d.value > 0);
 
-      <div className="flex justify-center items-center mb-6 space-x-8 ">
-        <button
-          className={tabClasses("stats")}
-          onClick={() => setActiveTab("stats")}
-        >
-          Stats
-        </button>
-        <button
-          className={tabClasses("users")}
-          onClick={() => setActiveTab("users")}
-        >
-          Users
-        </button>
+  return (
+    <div className="bg-[#F3F4FE] min-h-[94vh] overflow-y-auto thin-scrollbar p-5 text-[#2D3748]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-xl font-bold text-gray-800">Admin Dashboard</h1>
+        <div className="flex gap-2">
+          <button className={tabClasses("stats")} onClick={() => setActiveTab("stats")}>
+            Stats
+          </button>
+          <button className={tabClasses("users")} onClick={() => setActiveTab("users")}>
+            Users
+          </button>
+        </div>
       </div>
 
       {activeTab === "stats" && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6 ">
-            <div className="bg-white rounded-2xl shadow p-4">
-              <h2 className="font-semibold text-lg">Active Users</h2>
-              <p className="text-2xl mt-2">{dashboardData.activeUsers}</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow p-4">
-              <h2 className="font-semibold text-lg">Total Tasks</h2>
-              <p className="text-2xl mt-2">{dashboardData.totalTasks}</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow p-4">
-              <h2 className="font-semibold text-lg">Overdue Tasks</h2>
-              <p className="text-2xl mt-2">{dashboardData.overdueTasks}</p>
-            </div>
+        <div className="flex flex-col gap-4">
+          {/* Stat Cards Row */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <StatCard label="Active Users" value={dashboardData.activeUsers} accent="#5A67D8" />
+            <StatCard label="Total Tasks" value={dashboardData.totalTasks} accent="#38B2AC" />
+            <StatCard label="Overdue Tasks" value={dashboardData.overdueTasks} accent="#E53E3E" />
+            <StatCard
+              label="Completion Rate"
+              value={
+                dashboardData.completionRate != null
+                  ? `${dashboardData.completionRate}%`
+                  : "-"
+              }
+              accent="#48BB78"
+            />
+            <StatCard
+              label="Avg Duration"
+              value={
+                dashboardData.avgTaskDurationDays != null
+                  ? `${Math.round(dashboardData.avgTaskDurationDays)}d`
+                  : "-"
+              }
+              accent="#ED8936"
+            />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-6 mb-6 cursor-pointer">
-            <div className="bg-white rounded-2xl shadow p-4">
-              <h2 className="font-semibold text-lg mb-4">Tasks By Priority</h2>
-              <ResponsiveContainer width="100%" height={250}>
+          {/* Priority + Status side by side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SectionCard title="Tasks by Priority">
+              <ResponsiveContainer width="100%" height={180}>
                 <PieChart>
                   <Pie
                     dataKey="value"
-                    data={[
-                      {
-                        name: "High",
-                        value: dashboardData?.tasksByPriority?.high,
-                      },
-                      {
-                        name: "Medium",
-                        value: dashboardData?.tasksByPriority?.medium,
-                      },
-                      { name: "Low", value: dashboardData?.tasksByPriority?.low },
-                      {
-                        name: "No priority",
-                        value: dashboardData?.tasksByPriority?.null,
-                      },
-                    ]}
+                    data={priorityPieData}
                     cx="50%"
                     cy="50%"
-                    outerRadius={80}
-                    className="cursor-pointer"
-                    label
+                    innerRadius={40}
+                    outerRadius={65}
+                    paddingAngle={3}
+                    label={({ name, percent }) =>
+                      `${name} ${(percent * 100).toFixed(0)}%`
+                    }
+                    labelLine={false}
                   >
-                    {COLORS.map((color, index) => (
-                      <Cell key={`cell-${index}`} fill={color} />
+                    {priorityPieData.map((_, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={PRIORITY_COLORS[index % PRIORITY_COLORS.length]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
+                  <Legend
+                    iconType="circle"
+                    iconSize={8}
+                    wrapperStyle={{ fontSize: "12px" }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
 
-            <div className="bg-white rounded-2xl shadow p-4">
-              <h2 className="font-semibold text-lg mb-4">Tasks By Status</h2>
-              <ResponsiveContainer
-                width="100%"
-                height={250}
-                className="cursor-pointer"
-              >
-                <BarChart data={dashboardData.tasksByStatus}>
-                  <XAxis dataKey="statusName" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar
-                    dataKey="tasksCount"
-                    fill="#5A67D8"
-                    radius={[4, 4, 0, 0]}
-                    className="cursor-pointer"
+            <SectionCard title="Tasks by Status">
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart
+                  data={dashboardData.tasksByStatus}
+                  barSize={32}
+                  margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" vertical={false} />
+                  <XAxis
+                    dataKey="statusName"
+                    tick={{ fontSize: 11, fill: "#718096" }}
+                    axisLine={false}
+                    tickLine={false}
                   />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "#718096" }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "#EEF2FF" }} />
+                  <Bar dataKey="tasksCount" fill="#5A67D8" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
           </div>
 
-          <div className="bg-white rounded-2xl shadow p-4 mb-6">
-            <h2 className="font-semibold text-lg mb-4">Recent Task</h2>
+          {/* Recent Tasks Table */}
+          <SectionCard title="Recent Tasks">
             {dashboardData?.recentTasks?.length === 0 ? (
-              <p>No recent tasks.</p>
+              <p className="text-sm text-gray-400">No recent tasks.</p>
             ) : (
-              <div className="space-y-2">
-                <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg overflow-x-hidden overflow-y-auto shadow-sm">
-                  <thead className="bg-gray-100 text-left text-sm font-semibold text-gray-700 ">
-                    <tr>
-                      <td className="px-4 py-2">Task Name</td>
-                      <td className="px-4 py-2">Task Description</td>
-                      <td className="px-4 py-2">Task Created</td>
-                      <td className="px-4 py-2">Task Status</td>
-                      <td className="px-4 py-2">Task Priority</td>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Task Name</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Description</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Assigned To</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Created</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Priority</th>
                     </tr>
                   </thead>
-
-                  <tbody className="divide-y divide-gray-100">
-                    {dashboardData?.recentTasks?.map((task: any) => (
-                      <tr
-                        key={task.id}
-                        className="p-4 border rounded-lg border-[#CBD5E0]"
-                      >
-                        <td className="px-4 py-2 font-semibold text-md text-gray-900">
-                          {task.task_name}
-                        </td>
-                        <td className="px-4 py-2 text-gray-700 ">
-                          {task.task_description || "No Description"}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-teal-700">
-                          {task.user.name}
-                        </td>
-                        <td className="px-4 py-2 text-sm">
-                          <span className="inline-block bg-blue-100 text-blue-800 rounded-full px-2 py-1 text-xs font-semibold">
-                            {task.status.name}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-sm">
-                          <span
-                            className={`inline-block px-2 py-1 rounded text-sm ${task.priority === "High"
-                                ? "bg-red-100 text-red-800"
-                                : task.priority === "Medium"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : task.priority === null
-                                    ? "bg-gray-100 text-gray-800"
-                                    : "bg-green-100 text-green-800"
-                              } `}
-                          >
-                            {task.priority || "No Priority"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                  <tbody>
+                    {dashboardData?.recentTasks?.map((task: any) => {
+                      const priority = normalizePriority(task.priority);
+                      return (
+                        <tr
+                          key={task.id}
+                          className="border-b border-gray-50 hover:bg-[#F7F8FF] transition-colors"
+                        >
+                          <td className="px-3 py-2.5 font-semibold text-gray-800">
+                            {task.task_name}
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-500 max-w-[160px] truncate">
+                            {task.task_description || "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-teal-600 font-medium">
+                            {task.user?.name}
+                          </td>
+                          <td className="px-3 py-2.5 text-gray-400">
+                            {new Date(task.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span className="inline-block bg-blue-50 text-blue-700 rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                              {task.status?.name}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <span
+                              className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                priority === "High"
+                                  ? "bg-red-50 text-red-700"
+                                  : priority === "Medium"
+                                  ? "bg-orange-50 text-orange-700"
+                                  : priority === "Low"
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-gray-50 text-gray-500"
+                              }`}
+                            >
+                              {priority || "No Priority"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
-          </div>
+          </SectionCard>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-2xl shadow p-4">
-              <h2 className="font-semibold text-lg mb-4">Monthly Tasks</h2>
-              <ResponsiveContainer
-                width="100%"
-                height={200}
-                className="cursor-pointer"
-              >
-                <BarChart data={dashboardData.monthlyTasks}>
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar
-                    dataKey="count"
-                    fill="#38B2AC"
-                    radius={[4, 4, 0, 0]}
-                    className=" cursor-pointer"
+          {/* Monthly / Weekly / Yearly */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <SectionCard title="Monthly Tasks">
+              <ResponsiveContainer width="100%" height={150}>
+                <BarChart
+                  data={dashboardData.monthlyTasks}
+                  barSize={24}
+                  margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" vertical={false} />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 10, fill: "#718096" }}
+                    axisLine={false}
+                    tickLine={false}
                   />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "#718096" }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "#E6FFFA" }} />
+                  <Bar dataKey="count" fill="#38B2AC" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-            <div className="bg-white rounded-2xl shadow p-4">
-              <h2 className="font-semibold text-lg mb-4">Weekly Tasks</h2>
-              <ResponsiveContainer
-                width="100%"
-                height={200}
-                className="cursor-pointer"
-              >
-                <BarChart data={dashboardData.weeklyTasks} barCategoryGap={"20%"}>
+            </SectionCard>
+
+            <SectionCard title="Weekly Tasks">
+              <ResponsiveContainer width="100%" height={150}>
+                <BarChart
+                  data={dashboardData.weeklyTasks}
+                  barSize={24}
+                  barCategoryGap="20%"
+                  margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" vertical={false} />
                   <XAxis
                     dataKey="week"
-                    tickFormatter={(week: any) => `Week ${week}`}
+                    tickFormatter={(w) => `Wk ${w}`}
+                    tick={{ fontSize: 10, fill: "#718096" }}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                  <YAxis />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "#718096" }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
                   <Tooltip
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         const { week, count } = payload[0].payload;
                         return (
-                          <div className="bg-white p-2 rounded shadow text-sm">
-                            <p className="font-semibold">Week {week}</p>
+                          <div className="bg-white border border-gray-100 shadow-lg rounded-lg px-3 py-2 text-sm">
+                            <p className="font-semibold text-gray-700">Week {week}</p>
                             <p className="text-[#434190]">Tasks: {count}</p>
                           </div>
                         );
                       }
                     }}
+                    cursor={{ fill: "#EEF2FF" }}
                   />
-                  <Bar
-                    dataKey="count"
-                    fill="#434190"
-                    radius={[4, 4, 0, 0]}
-                    className=" cursor-pointer"
-                  />
+                  <Bar dataKey="count" fill="#434190" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-            <div className="bg-white rounded-2xl shadow p-4">
-              <h2 className="font-semibold text-lg mb-4">Yearly Tasks</h2>
-              <ResponsiveContainer
-                width="100%"
-                height={200}
-                className="cursor-pointer"
-              >
-                <BarChart data={dashboardData.yearlyTasks}>
-                  <XAxis dataKey="year" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar
-                    dataKey="count"
-                    fill="#5A67D8"
-                    radius={[4, 4, 0, 0]}
-                    className=" cursor-pointer"
+            </SectionCard>
+
+            <SectionCard title="Yearly Tasks">
+              <ResponsiveContainer width="100%" height={150}>
+                <BarChart
+                  data={dashboardData.yearlyTasks}
+                  barSize={24}
+                  margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" vertical={false} />
+                  <XAxis
+                    dataKey="year"
+                    tick={{ fontSize: 10, fill: "#718096" }}
+                    axisLine={false}
+                    tickLine={false}
                   />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "#718096" }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "#EEF2FF" }} />
+                  <Bar dataKey="count" fill="#5A67D8" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </SectionCard>
           </div>
-        </>
+
+          {/* Status Trends Line Chart */}
+          {dashboardData?.statusTrends?.length > 0 && (
+            <SectionCard title="Completion Trend — Last 30 Days">
+              <ResponsiveContainer width="100%" height={140}>
+                <LineChart
+                  data={dashboardData.statusTrends}
+                  margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: "#718096" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "#718096" }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<CustomBarTooltip />} />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#5A67D8"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#5A67D8" }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </SectionCard>
+          )}
+        </div>
       )}
 
       {activeTab === "users" && (
-        <>
-          <div className="bg-white rounded-2xl shadow p-4 mb-6">
-            <h2 className="font-semibold text-lg mb-4">All Users</h2>
+        <div className="flex flex-col gap-4">
+          <SectionCard title="All Users">
             {dashboardData?.allIsActiveUsers?.length === 0 ? (
-              <p>No users found.</p>
+              <p className="text-sm text-gray-400">No users found.</p>
             ) : (
-              <div className="space-y-2">
-                <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-                  <thead className="bg-gray-100 text-left text-sm font-semibold text-gray-700 ">
-                    <tr>
-                      <td className="px-4 py-2">ID</td>
-                      <td className="px-4 py-2">Name</td>
-                      <td className="px-4 py-2">Email</td>
-                      <td className="px-4 py-2">Status</td>
-                      <td className="px-4 py-2">Toggle Status</td>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">ID</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Name</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Email</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">Action</th>
                     </tr>
                   </thead>
-
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody>
                     {dashboardData?.allIsActiveUsers?.map((user: any) => (
                       <tr
                         key={user.id}
-                        className="p-4 border rounded-lg border-[#CBD5E0]"
+                        className="border-b border-gray-50 hover:bg-[#F7F8FF] transition-colors"
                       >
-                        <td className="px-4 py-2 font-semibold text-md text-gray-900">
-                          {user.id}
-                        </td>
-                        <td className="px-4 py-2 text-gray-700 ">{user.name}</td>
-                        <td className="px-4 py-2 text-sm text-teal-700">
-                          {user.email}
-                        </td>
-                        <td className="px-4 py-2 text-sm">
+                        <td className="px-3 py-2.5 font-semibold text-gray-800">{user.id}</td>
+                        <td className="px-3 py-2.5 text-gray-700">{user.name}</td>
+                        <td className="px-3 py-2.5 text-teal-600">{user.email}</td>
+                        <td className="px-3 py-2.5">
                           {user.isActive ? (
-                            <span className="inline-block bg-green-100 text-green-800 rounded-md px-2 py-1 text-xs font-semibold">
+                            <span className="inline-block bg-green-50 text-green-700 rounded-full px-2.5 py-0.5 text-xs font-semibold">
                               Active
                             </span>
                           ) : (
-                            <span className="inline-block bg-red-100 text-red-800 rounded-full px-2 py-1 text-xs font-semibold">
+                            <span className="inline-block bg-red-50 text-red-700 rounded-full px-2.5 py-0.5 text-xs font-semibold">
                               Inactive
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-3 py-2.5">
                           <button
                             onClick={handleToggleUserStatus.bind(null, user.id)}
-                            className={`px-2 py-2 rounded-lg text-[12px] font-semibold transition-colors ${user.isActive
-                                ? "bg-red-100 text-red-800 hover:bg-red-200"
-                                : "bg-green-100 text-green-800 hover:bg-green-200"
-                              } cursor-pointer `}
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                              user.isActive
+                                ? "bg-red-50 text-red-700 hover:bg-red-100"
+                                : "bg-green-50 text-green-700 hover:bg-green-100"
+                            }`}
                           >
                             {user.isActive ? "Deactivate" : "Activate"}
                           </button>
@@ -343,8 +469,8 @@ const AdminDashboard = () => {
                 </table>
               </div>
             )}
-          </div>
-        </>
+          </SectionCard>
+        </div>
       )}
     </div>
   );

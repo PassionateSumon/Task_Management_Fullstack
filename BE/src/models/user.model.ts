@@ -57,6 +57,10 @@ export default (sequelize: any, DataType: any) => {
     { tableName: "User", timestamps: true }
   );
   User.associate = (models: any) => {
+    User.belongsTo(models.Workspace, {
+      foreignKey: "workspace_id",
+      as: "workspace",
+    });
     User.hasMany(models.Task, {
       foreignKey: "user_id",
       as: "tasks",

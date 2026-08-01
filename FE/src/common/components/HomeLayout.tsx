@@ -2,117 +2,118 @@ import { useDispatch, useSelector } from "react-redux";
 import { Outlet, NavLink } from "react-router-dom";
 import type { AppDispatch, RootState } from "../../store/store";
 import { logout } from "../../modules/auth/slices/AuthSlice";
-import { 
-  LayoutDashboard, 
-  LogOut, 
-  UserCircle, 
-  CheckSquare, 
-  Activity, 
-  // UserPlus, 
-  BarChart2, 
+import {
+  LayoutDashboard,
+  LogOut,
+  CheckSquare,
+  Activity,
+  BarChart2,
   ShieldCheck,
-  // ChevronRight
 } from "lucide-react";
 
 const HomeLayout = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { role } = useSelector((state: RootState) => state.auth);
 
-  const navLinkClasses = ({ isActive }: { isActive: boolean }) =>
-    `group relative flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+  const navLink = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
       isActive
-        ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200/50" 
-        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+        ? "bg-[#EEF2FF] text-[#5A67D8] font-semibold"
+        : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 font-medium"
     }`;
 
+  const initial = role ? role.charAt(0).toUpperCase() : "U";
+
   return (
-    <div className="min-h-screen flex bg-slate-50/50 overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-72 bg-white border-r border-slate-200 px-6 py-8 flex flex-col justify-between shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-        <div>
-          <div className="flex items-center gap-3 mb-10 px-2">
-            <div className="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-100">
-              <LayoutDashboard className="w-5 h-5 text-white" />
-            </div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Task Vault</h1>
+    <div className="flex h-screen overflow-hidden bg-[#F3F4FE]">
+
+      {/* ── Sidebar ── */}
+      <aside className="w-56 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col h-screen">
+
+        {/* Logo — fixed at top */}
+        <div className="flex items-center gap-2.5 px-5 py-5 flex-shrink-0">
+          <div className="w-7 h-7 bg-[#5A67D8] rounded-lg flex items-center justify-center flex-shrink-0">
+            <LayoutDashboard className="w-3.5 h-3.5 text-white" />
+          </div>
+          <span className="text-sm font-bold text-gray-900 tracking-tight">Task Vault</span>
+        </div>
+
+        {/* Nav links — scrollable middle zone if needed */}
+        <div className="flex-1 overflow-y-auto px-3 pb-3 flex flex-col gap-5 min-h-0 thin-scrollbar"
+          style={{ scrollbarWidth: "thin", scrollbarColor: "#E2E8F0 transparent" }}
+        >
+
+          {/* Core Menu */}
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-1.5">
+              Core Menu
+            </p>
+            <nav className="flex flex-col gap-0.5">
+              <NavLink to="task" className={navLink}>
+                <CheckSquare className="w-4 h-4 flex-shrink-0" />
+                Tasks
+              </NavLink>
+              {role === "admin" && (
+                <NavLink to="status" className={navLink}>
+                  <Activity className="w-4 h-4 flex-shrink-0" />
+                  Status
+                </NavLink>
+              )}
+            </nav>
           </div>
 
-          <div className="space-y-6">
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] px-4 mb-3">Core Menu</p>
-              <nav className="space-y-1.5">
-                <NavLink to="task" className={navLinkClasses}>
-                  <div className="flex items-center gap-3">
-                    <CheckSquare className="w-5 h-5" />
-                    <span>Tasks</span>
-                  </div>
+          {/* Analytics */}
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-1.5">
+              Analytics
+            </p>
+            <nav className="flex flex-col gap-0.5">
+              <NavLink to="dashboard/me" end className={navLink}>
+                <BarChart2 className="w-4 h-4 flex-shrink-0" />
+                Personal Board
+              </NavLink>
+              {role === "admin" && (
+                <NavLink to="dashboard" end className={navLink}>
+                  <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                  Admin Board
                 </NavLink>
-
-                {role === "admin" && <NavLink to="status" className={navLinkClasses}>
-                  <div className="flex items-center gap-3">
-                    <Activity className="w-5 h-5" />
-                    <span>Status</span>
-                  </div>
-                </NavLink>}
-
-                {/* {role === "admin" && (
-                  <NavLink to="invite" className={navLinkClasses}>
-                    <div className="flex items-center gap-3">
-                      <UserPlus className="w-5 h-5" />
-                      <span>Invite</span>
-                    </div>
-                  </NavLink>
-                )} */}
-              </nav>
-            </div>
-
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] px-4 mb-3">Analytics</p>
-              <nav className="space-y-1.5">
-                <NavLink to="dashboard/me" end className={navLinkClasses}>
-                  <div className="flex items-center gap-3">
-                    <BarChart2 className="w-5 h-5" />
-                    <span>Personal Board</span>
-                  </div>
-                </NavLink>
-                {role === "admin" && (
-                  <NavLink to="dashboard" end className={navLinkClasses}>
-                    <div className="flex items-center gap-3">
-                      <ShieldCheck className="w-5 h-5" />
-                      <span>Admin Board</span>
-                    </div>
-                  </NavLink>
-                )}
-              </nav>
-            </div>
+              )}
+            </nav>
           </div>
         </div>
 
-        <div className="pt-6 border-t border-slate-100 space-y-3">
-          <NavLink to="profile" className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-            <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 border border-slate-200">
-              <UserCircle className="w-5 h-5" />
+        {/* Bottom — always pinned, never overlaps */}
+        <div className="flex-shrink-0 border-t border-gray-100 px-3 py-3 flex flex-col gap-0.5">
+          <NavLink
+            to="profile"
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors ${
+                isActive ? "bg-[#EEF2FF]" : "hover:bg-gray-50"
+              }`
+            }
+          >
+            <div className="w-7 h-7 rounded-lg bg-[#5A67D8] flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-bold text-white">{initial}</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="leading-none text-slate-900 truncate">My Profile</p>
-              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{role}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-800 leading-tight">My Profile</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide">{role}</p>
             </div>
           </NavLink>
 
           <button
             onClick={() => dispatch(logout())}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-rose-500 hover:bg-rose-50 transition-all group cursor-pointer"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer group w-full"
           >
-            <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span>Logout</span>
+            <LogOut className="w-4 h-4 flex-shrink-0 group-hover:-translate-x-0.5 transition-transform" />
+            Logout
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-8 max-w-[1600px] mx-auto h-full">
-          <Outlet />
-        </div>
+      {/* ── Main content — only this scrolls ── */}
+      <main className="flex-1 overflow-y-auto min-w-0">
+        <Outlet />
       </main>
     </div>
   );

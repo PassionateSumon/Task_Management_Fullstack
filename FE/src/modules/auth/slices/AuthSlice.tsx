@@ -6,7 +6,6 @@ import type {
   SignupPayload,
 } from "../types/Auth.interface";
 import axiosInstance from "../../../common/utils/AxiosInstance";
-// import axios from "axios";
 
 const initialState: AuthState = {
   isLoggedIn: false,

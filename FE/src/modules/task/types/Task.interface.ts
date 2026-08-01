@@ -13,12 +13,31 @@ export interface Task {
   tasks?: any[]; // For view-day mode
 }
 
+export interface TaskQueryParams {
+  viewType?: "kanban" | "compact" | "calendar" | "table";
+  id?: number | null;
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  priority?: string;
+  start_date?: string;
+  end_date?: string;
+  sortBy?: string;
+  sortOrder?: "ASC" | "DESC" | "asc" | "desc";
+}
+
 export interface TaskState {
   tasks: Task[] | { [key: string]: Task[] }; // For compact, kanban, or calendar views
   currentTask: Task | null;
   loading: boolean;
   error: string | null;
   isUpdatingOrDeleting?: boolean;
+  totalItems?: number;
+  totalPages?: number;
+  currentPage?: number;
+  limit?: number;
+  lastQueryParams?: TaskQueryParams;
 }
 
 export interface TaskModalProps {

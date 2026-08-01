@@ -10,7 +10,14 @@ export const registerSwagger = async (server: Hapi.Server) => {
     Vision,
     {
       plugin: HapiSwagger,
-      options: swaggerOptions,
+      options: {
+        ...swaggerOptions,
+        swaggerUIPath: '/swaggerui/',
+        documentationPath: '/documentation',
+        uiOptions: {
+          requestInterceptor: `(req) => { req.credentials = 'include'; return req; }`,
+        },
+      },
     },
   ]);
 };

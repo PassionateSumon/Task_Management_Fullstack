@@ -6,6 +6,7 @@ import type { RootState, AppDispatch } from "../../../store/store";
 import { toast } from "react-toastify";
 import { Mail, Lock, KeyRound } from "lucide-react";
 import { Hash } from "../../../common/utils/Hash";
+import { getStrictPasswordError } from "../../../common/validation/password";
 
 interface ResetPasswordForm {
   emailOrUsername: string;
@@ -43,6 +44,12 @@ const ResetPassword = () => {
 
     if (!emailOrUsername || !tempPassword || !newPassword) {
       toast.error("All fields are required.", { toastId: "reset-password-validation" });
+      return;
+    }
+
+    const pwdErr = getStrictPasswordError(newPassword);
+    if (pwdErr) {
+      toast.error(pwdErr, { toastId: "reset-password-validation" });
       return;
     }
 
@@ -116,7 +123,7 @@ const ResetPassword = () => {
               value={formData.newPassword}
               onChange={(e) => handleChange(e, "newPassword")}
               className="w-full outline-none text-sm"
-              placeholder="At least 6 characters"
+              placeholder="10+ chars with upper, lower, number & symbol"
             />
           </div>
         </div>

@@ -8,7 +8,13 @@ import {
   resetPasswordHandler,
   signupHandler,
 } from "../controller/auth.controller.js";
-import Joi from "joi";
+import {
+  loginPayloadSchema,
+  otpCheckPayloadSchema,
+  otpSendPayloadSchema,
+  resetPasswordPayloadSchema,
+  signupPayloadSchema,
+} from "../validation/auth.validation.js";
 
 const prefix = "/auth";
 
@@ -22,12 +28,7 @@ export default [
       tags: ["api", "auth"],
       description: "User signup",
       validate: {
-        payload: Joi.object({
-          name: Joi.string().required(),
-          email: Joi.string().email().required(),
-          password: Joi.string().required(),
-          user_type: Joi.string().optional(),
-        }),
+        payload: signupPayloadSchema,
       },
       payload: {
         parse: true,
@@ -44,10 +45,7 @@ export default [
       tags: ["api", "auth"],
       description: "User login",
       validate: {
-        payload: Joi.object({
-          emailOrUsername: Joi.string().required(),
-          password: Joi.string().required(),
-        }),
+        payload: loginPayloadSchema,
       },
       payload: {
         parse: true,
@@ -65,9 +63,7 @@ export default [
       tags: ["api", "auth"],
       description: "Send OTP",
       validate: {
-        payload: Joi.object({
-          email: Joi.string().required(),
-        }),
+        payload: otpSendPayloadSchema,
       },
       payload: {
         parse: true,
@@ -84,10 +80,7 @@ export default [
       tags: ["api", "auth"],
       description: "OTP verification",
       validate: {
-        payload: Joi.object({
-          email: Joi.string().required(),
-          otp: Joi.string().required(),
-        }),
+        payload: otpCheckPayloadSchema,
       },
       payload: {
         parse: true,
@@ -105,11 +98,7 @@ export default [
       tags: ["api", "auth"],
       description: "Password reset",
       validate: {
-        payload: Joi.object({
-          emailOrUsername: Joi.string().required(),
-          tempPassword: Joi.string().required(),
-          newPassword: Joi.string().required(),
-        }),
+        payload: resetPasswordPayloadSchema,
       },
       payload: {
         parse: true,
@@ -139,6 +128,11 @@ export default [
       auth: "jwt_access",
       tags: ["api", "auth"],
       description: "Get user details",
+      plugins: {
+        "hapi-swagger": {
+          security: [{ cookieAuth: [] }],
+        },
+      },
     },
   },
   {
@@ -149,6 +143,11 @@ export default [
       auth: "jwt_access",
       tags: ["api", "auth"],
       description: "User logout",
+      plugins: {
+        "hapi-swagger": {
+          security: [{ cookieAuth: [] }],
+        },
+      },
     },
   },
 ];

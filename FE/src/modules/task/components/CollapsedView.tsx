@@ -3,8 +3,20 @@ import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-p
 import { ChevronDown, Calendar, Trash2, Edit3 } from "lucide-react";
 import type { CollapsedViewProps } from "../types/Task.interface";
 
-const CollapsedView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, handleEditTask, handleDeleteTask, expandedStatuses, expandedTasks, toggleStatus, toggleTask, dispatch }: CollapsedViewProps) => {
-  const flattenedTasks = !Array.isArray(tasks) ? Object.values(tasks).flat() : Array.isArray(tasks) ? tasks : [];
+const priorityConfig: Record<string, { label: string; cls: string }> = {
+  high: { label: "High", cls: "bg-red-50 text-red-600" },
+  medium: { label: "Medium", cls: "bg-orange-50 text-orange-600" },
+  low: { label: "Low", cls: "bg-green-50 text-green-700" },
+};
+
+const CollapsedView = ({
+  tasks, loading, error, getStatusStyle, handleOpenModal,
+  handleEditTask, handleDeleteTask, expandedStatuses, expandedTasks,
+  toggleStatus, toggleTask, dispatch,
+}: CollapsedViewProps) => {
+  const flattenedTasks = !Array.isArray(tasks)
+    ? Object.values(tasks).flat()
+    : tasks;
 
   const collapsedColumns = flattenedTasks.reduce((acc: any, task: any) => {
     const status = task.status?.name || "No Status";
@@ -17,91 +29,136 @@ const CollapsedView = ({ tasks, loading, error, getStatusStyle, handleOpenModal,
     const { source, destination, draggableId } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-    const taskId = parseInt(draggableId);
     if (source.droppableId !== destination.droppableId) {
-      dispatch(updateTask({ id: taskId, payload: { status: destination.droppableId } }));
+      dispatch(updateTask({ id: parseInt(draggableId), payload: { status: destination.droppableId } }));
     }
   };
 
   return (
-    <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-200 h-[calc(100vh-280px)] flex flex-col overflow-hidden">
-      <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
-        <h2 className="text-slate-900 text-lg font-extrabold tracking-tight">Tasks</h2>
-        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
-          {flattenedTasks.length} {flattenedTasks.length === 1 ? 'Active' : 'Active Tasks'}
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm h-full flex flex-col overflow-hidden">
+
+      {/* Header */}
+      <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+        <h2 className="text-sm font-bold text-gray-800">All Tasks</h2>
+        <span className="text-[10px] font-bold text-[#5A67D8] bg-indigo-50 px-2 py-0.5 rounded-full uppercase tracking-wider">
+          {flattenedTasks.length} {flattenedTasks.length === 1 ? "task" : "tasks"}
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 thin-scrollbar">
-        {error && <p className="text-rose-500 text-center py-4 text-xs font-semibold">{error}</p>}
+      {/* Scrollable list */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-1.5 thin-scrollbar">
+        {error && <p className="text-red-500 text-center py-4 text-xs">{error}</p>}
         {loading && !flattenedTasks.length ? (
-           <p className="text-slate-400 text-center py-10 animate-pulse text-sm">Loading...</p>
+          <p className="text-gray-400 text-center py-10 text-sm animate-pulse">Loading...</p>
         ) : (
           <DragDropContext onDragEnd={onDragEnd}>
             {Object.keys(collapsedColumns).length === 0 ? (
-              <p className="text-slate-400 text-center py-10 text-sm italic">No tasks available.</p>
+              <p className="text-gray-400 text-center py-10 text-sm">No tasks yet.</p>
             ) : (
-              (Object.entries(collapsedColumns) as [string, any[]][]).map(([status, tasks]) => {
-                const { symbol } = getStatusStyle(status);
+              (Object.entries(collapsedColumns) as [string, any[]][]).map(([status, statusTasks]) => {
+                const { color } = getStatusStyle(status);
                 const isExpanded = expandedStatuses[status];
 
                 return (
                   <Droppable droppableId={status} key={status}>
                     {(provided) => (
-                      <div className="mb-2" {...provided.droppableProps} ref={provided.innerRef}>
+                      <div className="" {...provided.droppableProps} ref={provided.innerRef}>
+
+                        {/* Group header */}
                         <button
                           onClick={() => toggleStatus(status)}
-                          className={`w-full flex justify-between items-center p-4 rounded-xl transition-all border ${isExpanded ? 'border-slate-200 bg-slate-50/50 shadow-sm' : 'border-transparent hover:bg-slate-50'}`}
+                          className="cursor-pointer w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors group"
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg">{symbol}</span>
-                            <h3 className="text-slate-800 text-sm font-bold uppercase tracking-wide">{status}</h3>
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                            <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">{status}</span>
+                            <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                              {statusTasks.length}
+                            </span>
                           </div>
-                          <ChevronDown size={18} className={`text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                          <ChevronDown
+                            size={14}
+                            className={`text-gray-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                          />
                         </button>
-                        
-                        {isExpanded && (
-                          <div className="mt-2 ml-4 space-y-2 border-l-2 border-slate-100 pl-4 py-2">
-                            {tasks.map((task: any, index: number) => (
-                              <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
-                                {(provided, snapshot) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    className={`bg-white rounded-xl border p-4 shadow-sm transition-all ${snapshot.isDragging ? "ring-2 ring-indigo-500/10 border-indigo-200" : "border-slate-100 hover:border-slate-200"}`}
-                                  >
-                                    <div className="flex items-center justify-between" onClick={() => toggleTask(task.id.toString())}>
-                                      <div className="flex items-center gap-3">
-                                        <h4 className="text-slate-800 font-bold text-sm" onClick={(e) => { e.stopPropagation(); handleOpenModal("view", task); }}>
-                                          {task.task_name}
-                                        </h4>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${task.priority === 'high' ? 'bg-rose-50 text-rose-500' : 'bg-amber-50 text-amber-500'}`}>
-                                          {task.priority}
-                                        </span>
-                                      </div>
-                                      <ChevronDown size={14} className={`text-slate-300 transition-transform ${expandedTasks[task.id.toString()] ? "rotate-180" : ""}`} />
-                                    </div>
 
-                                    {expandedTasks[task.id.toString()] && (
-                                      <div className="mt-4 pt-4 border-t border-slate-50 space-y-4 animate-in fade-in slide-in-from-top-1">
-                                        <div className="flex gap-6">
-                                          <div className="flex flex-col gap-1">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase">Deadline</span>
-                                            <span className="text-xs text-slate-600 font-semibold flex items-center gap-1.5"><Calendar size={12}/>{task.end_date?.split("T")[0]}</span>
+                        {/* Task rows */}
+                        {isExpanded && (
+                          <div className="ml-3 mt-1 mb-2 border-l-2 border-gray-100 pl-3 space-y-1">
+                            {statusTasks.map((task: any, index: number) => {
+                              const pCfg = priorityConfig[task.priority?.toLowerCase()] ?? null;
+                              return (
+                                <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
+                                  {(provided, snapshot) => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                      className={`bg-white rounded-lg border px-3 py-2.5 transition-all ${snapshot.isDragging
+                                          ? "border-[#5A67D8]/30 shadow-md"
+                                          : "border-gray-100 hover:border-gray-200 hover:shadow-sm"
+                                        }`}
+                                    >
+                                      {/* Row: name + actions */}
+                                      <div
+                                        className="flex items-center justify-between gap-2 cursor-pointer"
+                                        onClick={() => toggleTask(task.id.toString())}
+                                      >
+                                        <span
+                                          className="text-sm font-semibold text-gray-800 truncate"
+                                          onClick={(e) => { e.stopPropagation(); handleOpenModal("view", task); }}
+                                        >
+                                          {task.task_name}
+                                        </span>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                          {pCfg && (
+                                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${pCfg.cls}`}>
+                                              {pCfg.label}
+                                            </span>
+                                          )}
+                                          <ChevronDown
+                                            size={13}
+                                            className={`text-gray-300 transition-transform duration-200 ${expandedTasks[task.id.toString()] ? "rotate-180" : ""
+                                              }`}
+                                          />
+                                        </div>
+                                      </div>
+
+                                      {/* Expanded detail */}
+                                      {expandedTasks[task.id.toString()] && (
+                                        <div className="mt-3 pt-3 border-t border-gray-50 space-y-2">
+                                          {task.task_description && (
+                                            <p className="text-xs text-gray-400 leading-relaxed line-clamp-3">
+                                              {task.task_description}
+                                            </p>
+                                          )}
+                                          {task.end_date && (
+                                            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                                              <Calendar size={11} />
+                                              {task.end_date.split("T")[0]}
+                                            </div>
+                                          )}
+                                          <div className="flex gap-1.5 justify-end">
+                                            <button
+                                              onClick={() => handleEditTask(task)}
+                                              className="p-1.5 rounded-md text-gray-400 hover:text-[#5A67D8] hover:bg-indigo-50 transition-colors"
+                                            >
+                                              <Edit3 size={13} />
+                                            </button>
+                                            <button
+                                              onClick={() => handleDeleteTask(task.id)}
+                                              className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                            >
+                                              <Trash2 size={13} />
+                                            </button>
                                           </div>
                                         </div>
-                                        <p className="text-xs text-slate-500 leading-relaxed italic">{task.task_description || "No description provided."}</p>
-                                        <div className="flex gap-2 justify-end">
-                                           <button onClick={() => handleEditTask(task)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"><Edit3 size={14}/></button>
-                                           <button onClick={() => handleDeleteTask(task.id)} className="p-2 text-slate-400 hover:text-rose-600 transition-colors"><Trash2 size={14}/></button>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))}
+                                      )}
+                                    </div>
+                                  )}
+                                </Draggable>
+                              );
+                            })}
                             {provided.placeholder}
                           </div>
                         )}

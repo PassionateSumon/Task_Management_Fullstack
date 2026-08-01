@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import type { StatusState } from "../types/Status.interfaces";
+import type { Status, StatusState } from "../types/Status.interfaces";
 import axiosInstance from "../../../common/utils/AxiosInstance";
 
 const initialState: StatusState = {
@@ -10,11 +10,18 @@ const initialState: StatusState = {
 
 export const createStatus = createAsyncThunk(
   "status/createStatus",
-  async ({ name }: { name: string }, { rejectWithValue }) => {
+  async (
+    { name, is_final }: { name: string; is_final?: boolean },
+    { rejectWithValue }
+  ) => {
     try {
-      const response = await axiosInstance.post("/status/create", { name }, {
-        headers: { "X-Skip-Loader": "true" },
-      });
+      const response = await axiosInstance.post(
+        "/status/create",
+        { name, is_final },
+        {
+          headers: { "X-Skip-Loader": "true" },
+        }
+      );
       return response.data;
     } catch (error: any) {
       return rejectWithValue(
@@ -29,7 +36,6 @@ export const getAllStatuses = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.get("/status/all");
-      // console.log(response.data)
       return response.data;
     } catch (error: any) {
       return rejectWithValue(
@@ -41,11 +47,18 @@ export const getAllStatuses = createAsyncThunk(
 
 export const updateStatus = createAsyncThunk(
   "status/updateStatus",
-  async ({ id, name }: { id: number; name: string }, { rejectWithValue, getState }) => {
+  async (
+    { id, name, is_final }: { id: number; name: string; is_final?: boolean },
+    { rejectWithValue, getState }
+  ) => {
     try {
-      const response = await axiosInstance.put("/status/update", { id, name }, {
-        headers: { "X-Skip-Loader": "true" },
-      });
+      const response = await axiosInstance.put(
+        "/status/update",
+        { id, name, is_final },
+        {
+          headers: { "X-Skip-Loader": "true" },
+        }
+      );
       return response.data;
     } catch (error: any) {
       return rejectWithValue(
@@ -61,10 +74,10 @@ export const updateStatus = createAsyncThunk(
 
 export const deleteStatus = createAsyncThunk(
   "status/deleteStatus",
-  async ({ id }: { id: number }, { rejectWithValue, getState }) => {
+  async ({ id, new_final_id }: { id: number; new_final_id?: number }, { rejectWithValue, getState }) => {
     try {
       const response = await axiosInstance.delete("/status/delete", {
-        data: { id },
+        data: { id, new_final_id },
         headers: { "X-Skip-Loader": "true" }
       });
       return response.data;
@@ -94,25 +107,27 @@ const StatusSlice = createSlice({
       .addCase(createStatus.pending, (state, action: any) => {
         state.loading = false;
         const newStatus = {
-          // id: Date.now(),
           id: action.meta.requestId,
           name: action.meta.arg.name,
-        }
+          is_final: action.meta.arg.is_final,
+        };
         state.statuses.push(newStatus);
         state.error = null;
       })
       .addCase(createStatus.fulfilled, (state, action) => {
         state.loading = false;
-        // console.log(action.payload)
-        const createdStatus = action.payload;
+        const payload = action.payload as { data?: Status; statusCode?: number };
+        const createdStatus = (payload?.data ?? payload) as Status;
+        if (!createdStatus?.id) {
+          state.error = null;
+          return;
+        }
         const index = state.statuses.findIndex(
           (status) => {
-            // console.log(JSON.parse(JSON.stringify(status)));
-            return status.id === createdStatus.id
+            return status.id === createdStatus.id;
           }
         );
         if (index !== -1) {
-          // console.log("here")
           state.statuses[index] = createdStatus;
         }
         state.error = null;
@@ -133,8 +148,11 @@ const StatusSlice = createSlice({
       })
       .addCase(getAllStatuses.fulfilled, (state, action) => {
         state.loading = false;
-        // console.log("104 --> slice --> ", action.payload);
-        state.statuses = action.payload;
+        const body = action.payload as {
+          data?: Status[];
+          statusCode?: number;
+        };
+        state.statuses = Array.isArray(body) ? body : body?.data ?? [];
       })
       .addCase(getAllStatuses.rejected, (state, action) => {
         state.loading = false;
@@ -145,10 +163,14 @@ const StatusSlice = createSlice({
     builder
       .addCase(updateStatus.pending, (state, action: any) => {
         state.loading = false;
-        const { id, name } = action.meta.arg;
+        const { id, name, is_final } = action.meta.arg;
         const index = state.statuses.findIndex((status) => status.id === id);
         if (index !== -1) {
-          state.statuses[index] = { ...state.statuses[index], name };
+          state.statuses[index] = {
+            ...state.statuses[index],
+            name,
+            ...(is_final !== undefined ? { is_final } : {}),
+          };
         }
 
         state.error = null;
