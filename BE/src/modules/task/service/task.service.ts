@@ -1,11 +1,12 @@
+import { statusCodes } from "../../../common/constants/constants.js";
 import { withTransaction } from "../../../common/utils/transaction.js";
-import type { TaskRepository } from "../../../infrastructure/persistence/task.repository.js";
+import { TaskRepositoryV2 } from "../../../infrastructure/persistence/task.repository-v2.js";
 import type { UserRepository } from "../../../infrastructure/persistence/user.repository.js";
 import type { IStatusReader } from "../ports/status-reader.port.js";
 
 export class TaskService {
   constructor(
-    private readonly tasks: TaskRepository,
+    private readonly tasks: TaskRepositoryV2,
     private readonly statusReader: IStatusReader,
     private readonly users: UserRepository,
   ) {}
@@ -34,7 +35,7 @@ export class TaskService {
         const endDate = new Date(end_date);
         if (endDate < startDate) {
           return {
-            statusCode: 400,
+            statusCode: statusCodes.BAD_REQUEST,
             message: "End date cannot be before start date",
             data: null,
           };
@@ -48,7 +49,7 @@ export class TaskService {
         );
         if (workspaceId == null) {
           return {
-            statusCode: 400,
+            statusCode: statusCodes.BAD_REQUEST,
             message: "No workspace assigned to this user",
             data: null,
           };
@@ -61,7 +62,7 @@ export class TaskService {
         );
         if (!status_id) {
           return {
-            statusCode: 404,
+            statusCode: statusCodes.NOT_FOUND,
             message: "Status not found",
             data: null,
           };
@@ -77,7 +78,7 @@ export class TaskService {
         );
         if (existed) {
           return {
-            statusCode: 409,
+            statusCode: statusCodes.CONFLICT,
             message: "Task already exists",
             data: null,
           };
@@ -97,20 +98,20 @@ export class TaskService {
         const result = await this.tasks.create(wrappedInput, transaction);
         if (!result) {
           return {
-            statusCode: 400,
+            statusCode: statusCodes.BAD_REQUEST,
             message: "Task creation failed",
             data: null,
           };
         }
         return {
-          statusCode: 200,
+          statusCode: statusCodes.SUCCESS,
           message: "Task created successfully",
           data: result,
         };
       });
     } catch (err: any) {
       return {
-        statusCode: 500,
+        statusCode: statusCodes.SERVER_ISSUE,
         message: err.message || "Internal server error",
         data: null,
       };
@@ -152,7 +153,7 @@ export class TaskService {
         },
       );
       if (!tasks)
-        return { statusCode: 404, message: "Tasks not found", data: null };
+        return { statusCode: statusCodes.NOT_FOUND, message: "Tasks not found", data: null };
 
       let result: unknown = {};
 
@@ -197,7 +198,7 @@ export class TaskService {
       }
 
       return {
-        statusCode: 200,
+        statusCode: statusCodes.SUCCESS,
         message: "Tasks fetched successfully",
         data: {
           data: result,
@@ -206,7 +207,7 @@ export class TaskService {
       };
     } catch {
       return {
-        statusCode: 500,
+        statusCode: statusCodes.SERVER_ISSUE,
         message: "Internal server error",
         data: null,
       };
@@ -220,19 +221,19 @@ export class TaskService {
       });
       if (!result) {
         return {
-          statusCode: 404,
+          statusCode: statusCodes.NOT_FOUND,
           message: "Task not found",
           data: null,
         };
       }
       return {
-        statusCode: 200,
+        statusCode: statusCodes.SUCCESS,
         message: "Task fetched successfully",
         data: result,
       };
     } catch (err: any) {
       return {
-        statusCode: 500,
+        statusCode: statusCodes.SERVER_ISSUE,
         message: err.message || "Internal server error",
         data: null,
       };
@@ -265,7 +266,7 @@ export class TaskService {
         );
         if (!taskRow) {
           return {
-            statusCode: 404,
+            statusCode: statusCodes.NOT_FOUND,
             message: "Task not found",
             data: null,
           };
@@ -281,7 +282,7 @@ export class TaskService {
           const endDate = new Date(dateToValidateEnd);
           if (endDate < startDate) {
             return {
-              statusCode: 400,
+              statusCode: statusCodes.BAD_REQUEST,
               message: "End date cannot be before start date",
               data: null,
             };
@@ -294,7 +295,7 @@ export class TaskService {
         );
         if (workspaceId == null) {
           return {
-            statusCode: 400,
+            statusCode: statusCodes.BAD_REQUEST,
             message: "Task owner has no workspace assigned",
             data: null,
           };
@@ -312,7 +313,7 @@ export class TaskService {
           );
           if (!statusRecord) {
             return {
-              statusCode: 404,
+              statusCode: statusCodes.NOT_FOUND,
               message: "Status not found",
               data: null,
             };
@@ -349,14 +350,14 @@ export class TaskService {
           transaction,
         );
         return {
-          statusCode: 200,
+          statusCode: statusCodes.SUCCESS,
           message: "Status updated successfully",
           data: finalRes,
         };
       });
     } catch (err: any) {
       return {
-        statusCode: 500,
+        statusCode: statusCodes.SERVER_ISSUE,
         message: err.message || "Internal server error",
         data: null,
       };
@@ -369,21 +370,21 @@ export class TaskService {
         const task = await this.tasks.findById(id, transaction);
         if (!task) {
           return {
-            statusCode: 404,
+            statusCode: statusCodes.NOT_FOUND,
             message: "Task not found",
             data: null,
           };
         }
         await this.tasks.destroyById(id, transaction);
         return {
-          statusCode: 200,
+          statusCode: statusCodes.SUCCESS,
           message: "Task deleted successfully",
           data: { id: id },
         };
       });
     } catch (err: any) {
       return {
-        statusCode: 500,
+        statusCode: statusCodes.SERVER_ISSUE,
         message: err.message || "Internal server error",
         data: null,
       };
