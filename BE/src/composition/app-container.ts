@@ -10,6 +10,7 @@ import { UserService } from "../modules/user/service/user.service.js";
 import { TaskService } from "../modules/task/service/task.service.js";
 import { StatusService } from "../modules/status/service/status.service.js";
 import { DashboardService } from "../modules/dashboard/service/dashboard.service.js";
+import { TaskRepositoryV2 } from "../infrastructure/persistence/task.repository-v2.js";
 
 const registry = db as DbRegistry;
 
@@ -18,7 +19,7 @@ export class AppContainer {
   readonly refreshTokenRepository: RefreshTokenRepository;
   readonly workspaceRepository: WorkspaceRepository;
   readonly statusRepository: StatusRepository;
-  readonly taskRepository: TaskRepository;
+  readonly taskRepository: TaskRepositoryV2;
 
   readonly authService: AuthService;
   readonly userService: UserService;
@@ -31,7 +32,7 @@ export class AppContainer {
     this.refreshTokenRepository = new RefreshTokenRepository(registry);
     this.workspaceRepository = new WorkspaceRepository(registry);
     this.statusRepository = new StatusRepository(registry);
-    this.taskRepository = new TaskRepository(registry);
+    this.taskRepository = new TaskRepositoryV2(registry);
 
     this.authService = new AuthService(
       this.userRepository,

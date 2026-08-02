@@ -1,6 +1,6 @@
 import { withTransaction } from "../../../common/utils/transaction.js";
 import type { StatusRepository } from "../../../infrastructure/persistence/status.repository.js";
-import type { TaskRepository } from "../../../infrastructure/persistence/task.repository.js";
+import { TaskRepositoryV2 } from "../../../infrastructure/persistence/task.repository-v2.js";
 import type { UserRepository } from "../../../infrastructure/persistence/user.repository.js";
 
 type StatusOpResult = {
@@ -12,7 +12,7 @@ type StatusOpResult = {
 export class StatusService {
   constructor(
     private readonly status: StatusRepository,
-    private readonly tasks: TaskRepository,
+    private readonly tasks: TaskRepositoryV2,
     private readonly users: UserRepository
   ) {}
 

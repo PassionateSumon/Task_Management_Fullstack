@@ -1,13 +1,13 @@
 import { statusCodes } from "../../../common/constants/constants.js";
 import { withTransaction } from "../../../common/utils/transaction.js";
 import type { UserRepository } from "../../../infrastructure/persistence/user.repository.js";
-import type { TaskRepository } from "../../../infrastructure/persistence/task.repository.js";
 import type { StatusRepository } from "../../../infrastructure/persistence/status.repository.js";
+import { TaskRepositoryV2 } from "../../../infrastructure/persistence/task.repository-v2.js";
 
 export class DashboardService {
   constructor(
     private readonly users: UserRepository,
-    private readonly tasks: TaskRepository,
+    private readonly tasks: TaskRepositoryV2,
     private readonly statuses: StatusRepository
   ) {}
 
