@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { createTask, refetchTasks, updateTask } from "../slices/TaskSlice";
+import { getWorkspaceUsers } from "../../user/slices/userSlice";
 import type { AppDispatch, RootState } from "../../../store/store";
 import { toast } from "react-toastify";
 import type { ExtendedTaskModalProps } from "../types/Task.interface";
@@ -17,12 +18,17 @@ const TaskModal = ({
   handleEditTask, handleDeleteTask,
 }: ExtendedTaskModalProps) => {
   const [formData, setFormData] = useState({
-    name: "", description: "", status: "", priority: "", start_date: "", end_date: "",
+    name: "", description: "", status: "", priority: "", assignee_id: "", start_date: "", end_date: "",
   });
 
   const dispatch = useDispatch<AppDispatch>();
   const { loading } = useSelector((state: RootState) => state.task);
+  const { workspaceUsers, loading: workspaceUsersLoading } = useSelector((state: RootState) => state.user);
   const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    dispatch(getWorkspaceUsers());
+  }, [dispatch]);
 
   useEffect(() => {
     if (task && (mode === "edit" || mode === "view")) {
@@ -31,11 +37,12 @@ const TaskModal = ({
         description: task.task_description || "",
         status: typeof task?.status === "string" ? task.status : task?.status?.name || "",
         priority: task.priority || "",
+        assignee_id: task.assignee?.id ? String(task.assignee.id) : task.assignee_id ? String(task.assignee_id) : "",
         start_date: task.start_date ? task.start_date.split("T")[0] : "",
         end_date: task.end_date ? task.end_date.split("T")[0] : "",
       });
     } else {
-      setFormData({ name: "", description: "", status: "", priority: "", start_date: "", end_date: "" });
+      setFormData({ name: "", description: "", status: "", priority: "", assignee_id: "", start_date: "", end_date: "" });
     }
   }, [task, mode]);
 
@@ -53,7 +60,7 @@ const TaskModal = ({
 
   const handleOnClose = () => {
     onClose();
-    setFormData({ name: "", description: "", status: "", priority: "", start_date: "", end_date: "" });
+    setFormData({ name: "", description: "", status: "", priority: "", assignee_id: "", start_date: "", end_date: "" });
   };
 
   const handleSubmit = async () => {
@@ -66,6 +73,7 @@ const TaskModal = ({
       description: formData.description || undefined,
       status: formData.status,
       priority: (formData.priority as any) || undefined,
+      assignee_id: formData.assignee_id ? Number(formData.assignee_id) : null,
       start_date: formData.start_date || undefined,
       end_date: formData.end_date || undefined,
     };
@@ -80,7 +88,7 @@ const TaskModal = ({
         toast.success("Task updated!"); 
       }
     }
-    setFormData({ name: "", description: "", status: "", priority: "", start_date: "", end_date: "" });
+    setFormData({ name: "", description: "", status: "", priority: "", assignee_id: "", start_date: "", end_date: "" });
     onClose(); 
     dispatch(refetchTasks()); 
   };
@@ -153,6 +161,23 @@ const TaskModal = ({
                 <option value="low">Low</option>
               </select>
             </div>
+          </div>
+
+          {/* Assignee */}
+          <div>
+            <label className={labelCls}>Assignee</label>
+            <select
+              name="assignee_id"
+              value={formData.assignee_id}
+              onChange={handleChange}
+              disabled={isViewMode || workspaceUsersLoading}
+              className={inputCls}
+            >
+              <option value="">Unassigned</option>
+              {workspaceUsers.map((member: any) => (
+                <option key={member.id} value={member.id}>{member.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Start + End date */}

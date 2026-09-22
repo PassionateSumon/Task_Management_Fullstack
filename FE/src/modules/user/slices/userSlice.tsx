@@ -4,9 +4,21 @@ import type { UserState } from "../types/User.interface";
 
 const initialState: UserState = {
     user: {},
+    workspaceUsers: [],
     loading: false,
     error: null,
 }
+
+export const getWorkspaceUsers = createAsyncThunk("user/getWorkspaceUsers", async (_, { rejectWithValue }) => {
+    try {
+        const res = await axiosInstance.get('/user/all?page=1&limit=100');
+        return res.data?.data?.data ?? [];
+    } catch (error: any) {
+        return rejectWithValue(
+            error.response?.data?.message || "Failed to fetch workspace users"
+        );
+    }
+});
 
 export const getUser = createAsyncThunk("user/getUser", async ({ id = null }: { id?: number | null }, { rejectWithValue }) => {
     try {
@@ -45,19 +57,31 @@ const UserSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
-            .addCase(getUser.pending, (state) => {
+                .addCase(getWorkspaceUsers.pending, (state) => {
                 state.loading = true;
                 state.error = null;
             })
-            .addCase(getUser.fulfilled, (state, action) => {
-                state.user = action.payload;
+                .addCase(getWorkspaceUsers.fulfilled, (state, action) => {
+                    state.workspaceUsers = action.payload || [];
                 state.loading = false;
             })
-            .addCase(getUser.rejected, (state, action) => {
+                .addCase(getWorkspaceUsers.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
             })
-            .addCase(updateUser.pending, (state, action: any) => {
+                .addCase(getUser.pending, (state) => {
+                    state.loading = true;
+                    state.error = null;
+                })
+                .addCase(getUser.fulfilled, (state, action) => {
+                    state.user = action.payload;
+                    state.loading = false;
+                })
+                .addCase(getUser.rejected, (state, action) => {
+                    state.loading = false;
+                    state.error = action.payload as string;
+                })
+                .addCase(updateUser.pending, (state, action: any) => {
                 const data = action.meta.arg;
                 state.user = { ...state.user, ...data };
                 state.error = null;

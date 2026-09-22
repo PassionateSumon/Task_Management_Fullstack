@@ -19,6 +19,11 @@ export default (sequelize: any, DataType: any) => {
         type: DataType.INTEGER,
         allowNull: false,
       },
+      assignee_id: {
+        type: DataType.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+      },
       status_id: {
         type: DataType.INTEGER,
         allowNull: false,
@@ -49,6 +54,11 @@ export default (sequelize: any, DataType: any) => {
     Task.belongsTo(models.User, {
       foreignKey: "user_id",
       as: "user",
+    });
+    Task.belongsTo(models.User, {
+      foreignKey: "assignee_id",
+      as: "assignee",
+      allowNull: true,
     });
     Task.belongsTo(models.Status, {
       foreignKey: "status_id",

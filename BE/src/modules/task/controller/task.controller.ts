@@ -14,6 +14,7 @@ export const createTaskHandler = async (req: Request, h: ResponseToolkit) => {
       priority?: "high" | "medium" | "low";
       start_date?: string;
       end_date?: string;
+      assignee_id?: number | null;
     };
     const result = await task().createTask(payload, userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
@@ -92,6 +93,10 @@ export const updateTaskHandler = async (req: Request, h: ResponseToolkit) => {
       name?: string;
       description?: string;
       status?: string;
+      priority?: "high" | "medium" | "low";
+      start_date?: string;
+      end_date?: string;
+      assignee_id?: number | null;
     };
     const result = await task().updateTask(id, payload);
     if (result.statusCode !== 200 && result.statusCode !== 201)

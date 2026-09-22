@@ -103,6 +103,13 @@ export class TaskRepositoryV2 implements ITaskWriter {
       attributes: ["id", "name", "is_final", "is_system"],
     };
 
+    const assigneeInclude: any = {
+      model: this.db.User,
+      as: "assignee",
+      attributes: ["id", "name", "email", "user_type", "workspace_id"],
+      required: false,
+    };
+
     if (options?.status) {
       statusInclude.where = { name: options.status };
     }
@@ -136,8 +143,9 @@ export class TaskRepositoryV2 implements ITaskWriter {
         "end_date",
         "completed_date",
         "user_id",
+        "assignee_id",
       ],
-      include: [statusInclude],
+      include: [statusInclude, assigneeInclude],
       transaction,
       order,
     };
@@ -165,6 +173,12 @@ export class TaskRepositoryV2 implements ITaskWriter {
           model: this.db.Status,
           as: "status",
           attributes: ["id", "name", "is_final", "is_system", "workspace_id"],
+        },
+        {
+          model: this.db.User,
+          as: "assignee",
+          attributes: ["id", "name", "email", "user_type", "workspace_id"],
+          required: false,
         },
       ],
       transaction,

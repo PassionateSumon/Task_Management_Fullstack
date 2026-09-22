@@ -20,6 +20,7 @@ export const createTask = createAsyncThunk(
       priority?: "high" | "medium" | "low";
       start_date?: string;
       end_date?: string;
+      assignee_id?: number | null;
     },
     { rejectWithValue }
   ) => {
@@ -116,6 +117,7 @@ export const updateTask = createAsyncThunk(
         priority?: "high" | "medium" | "low";
         start_date?: string;
         end_date?: string;
+        assignee_id?: number | null;
       };
     },
     { rejectWithValue, getState }

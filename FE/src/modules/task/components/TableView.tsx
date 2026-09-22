@@ -51,6 +51,18 @@ const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, han
       },
     },
     {
+      accessorKey: "assignee.name",
+      header: "Assignee",
+      cell: ({ getValue }) => {
+        const assigneeName = getValue() as string | undefined;
+        return assigneeName ? (
+          <span className="text-xs font-medium text-gray-700">{assigneeName}</span>
+        ) : (
+          <span className="text-[10px] text-gray-300">Unassigned</span>
+        );
+      },
+    },
+    {
       accessorKey: "priority",
       header: "Priority",
       cell: ({ getValue }) => {

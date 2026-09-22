@@ -8,6 +8,7 @@ export const createTaskPayloadSchema = Joi.object({
   priority: Joi.string().valid("high", "medium", "low").optional(),
   start_date: Joi.string().optional(),
   end_date: Joi.string().optional(),
+  assignee_id: Joi.number().integer().positive().allow(null).optional(),
 });
 
 export const updateTaskPayloadSchema = Joi.object({
@@ -17,8 +18,9 @@ export const updateTaskPayloadSchema = Joi.object({
   priority: Joi.string().valid("high", "medium", "low").optional(),
   start_date: Joi.date().optional(),
   end_date: Joi.date().optional(),
+  assignee_id: Joi.number().integer().positive().allow(null).optional(),
 })
-  .or("name", "description", "status", "priority", "start_date", "end_date")
+  .or("name", "description", "status", "priority", "start_date", "end_date", "assignee_id")
   .messages({
     "object.missing": "At least one field must be provided to update",
   });

@@ -58,9 +58,18 @@ export class UserRepository {
     options?: { page?: number; limit?: number; search?: string },
     transaction?: Transaction
   ) {
+    const currentUser = await this.db.User.findByPk(userId, {
+      attributes: ["workspace_id"],
+      transaction,
+    });
+
     const where: any = {
       id: { [Op.ne]: userId },
     };
+
+    if (currentUser?.workspace_id != null) {
+      where.workspace_id = currentUser.workspace_id;
+    }
 
     if (options?.search) {
       where[Op.or] = [

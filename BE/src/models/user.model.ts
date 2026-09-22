@@ -66,6 +66,11 @@ export default (sequelize: any, DataType: any) => {
       as: "tasks",
       onDelete: "CASCADE",
     });
+    User.hasMany(models.Task, {
+      foreignKey: "assignee_id",
+      as: "assignedTasks",
+      onDelete: "SET NULL",
+    });
     User.hasMany(models.RefreshToken, { foreignKey: "userId" });
   };
   return User;
