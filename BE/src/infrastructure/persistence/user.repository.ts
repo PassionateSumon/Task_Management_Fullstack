@@ -93,6 +93,45 @@ export class UserRepository {
     return this.db.User.findAndCountAll(queryOptions);
   }
 
+  async findAllUsers(
+    userId: number,
+    options?: { page?: number; limit?: number; search?: string },
+    transaction?: Transaction
+  ) {
+    const currentUser = await this.db.User.findByPk(userId, {
+      attributes: ["workspace_id"],
+      transaction,
+    });
+
+    const where: any = {};
+
+    if (currentUser?.workspace_id != null) {
+      where.workspace_id = currentUser.workspace_id;
+    }
+
+    if (options?.search) {
+      where[Op.or] = [
+        { name: { [Op.like]: `%${options.search}%` } },
+        { email: { [Op.like]: `%${options.search}%` } },
+      ];
+    }
+
+    const queryOptions: any = {
+      attributes: { exclude: ["password"] },
+      where,
+      transaction,
+      order: [["createdAt", "DESC"]],
+    };
+
+    if (options?.limit && options?.page) {
+      queryOptions.limit = options.limit;
+      queryOptions.offset = (options.page - 1) * options.limit;
+    }
+
+    return this.db.User.findAndCountAll(queryOptions);
+  }
+
+
   async findOneByIdExcludePassword(
     id: number | string,
     transaction?: Transaction

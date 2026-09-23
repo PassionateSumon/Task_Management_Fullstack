@@ -71,6 +71,12 @@ export default (sequelize: any, DataType: any) => {
       as: "assignedTasks",
       onDelete: "SET NULL",
     });
+    User.belongsToMany(models.Task, {
+      through: models.TaskAssignee,
+      foreignKey: "user_id",
+      otherKey: "task_id",
+      as: "assignedTasksMultiple",
+    });
     User.hasMany(models.RefreshToken, { foreignKey: "userId" });
   };
   return User;

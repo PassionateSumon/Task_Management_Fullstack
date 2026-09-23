@@ -6,6 +6,7 @@ import Task from "../models/task.model.js";
 import Status from "../models/status.model.js";
 import RefreshToken from "../models/refreshToken.model.js";
 import Workspace from "../models/workspace.model.js";
+import TaskAssignee from "../models/taskAssignee.model.js";
 dotenv.config();
 
 const { DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT } = process.env as any;
@@ -26,6 +27,7 @@ db.User = User(sequelize, DataType);
 db.Task = Task(sequelize, DataType);
 db.Status = Status(sequelize, DataType);
 db.RefreshToken = RefreshToken(sequelize, DataType);
+db.TaskAssignee = TaskAssignee(sequelize, DataType);
 
 // Setup associations
 Object.values(db).forEach((model: any) => {

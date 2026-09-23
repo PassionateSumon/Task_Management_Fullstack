@@ -19,7 +19,7 @@ export class TaskService {
       priority,
       start_date,
       end_date,
-      assignee_id,
+      assignee_ids = [],
     }: {
       name: string;
       description?: string;
@@ -27,7 +27,7 @@ export class TaskService {
       priority?: "high" | "medium" | "low";
       start_date?: string;
       end_date?: string;
-      assignee_id?: number | null;
+      assignee_ids?: number[];
     },
     userId: number,
   ) {
@@ -57,22 +57,10 @@ export class TaskService {
           };
         }
 
-        if (assignee_id != null) {
-          const assignee = await this.users.findOneById(assignee_id, transaction);
-          if (!assignee) {
-            return {
-              statusCode: statusCodes.NOT_FOUND,
-              message: "Assignee not found",
-              data: null,
-            };
-          }
-          if (assignee.workspace_id !== workspaceId) {
-            return {
-              statusCode: statusCodes.BAD_REQUEST,
-              message: "Assignee must belong to the same workspace",
-              data: null,
-            };
-          }
+        for (const assigneeId of assignee_ids) {
+          const assignee = await this.users.findOneById(assigneeId, transaction);
+          if (!assignee) return { statusCode: statusCodes.NOT_FOUND, message: "Assignee not found", data: null };
+          if (assignee.workspace_id !== workspaceId) return { statusCode: statusCodes.BAD_REQUEST, message: "All assignees must belong to the same workspace", data: null };
         }
 
         const status_id = await this.statusReader.findOneByNameInWorkspace(
@@ -108,7 +96,7 @@ export class TaskService {
           task_name: name,
           task_description: description ? description : null,
           user_id: userId,
-          assignee_id: assignee_id ?? null,
+          assignee_id: assignee_ids[0] ?? null,
           status_id: status_id.id,
           priority: priority ? priority : null,
           start_date: start_date ? start_date : null,
@@ -124,6 +112,7 @@ export class TaskService {
             data: null,
           };
         }
+        await this.tasks.replaceAssignees(result.id, assignee_ids, transaction);
         return {
           statusCode: statusCodes.SUCCESS,
           message: "Task created successfully",
@@ -270,7 +259,7 @@ export class TaskService {
       priority,
       start_date,
       end_date,
-      assignee_id,
+      assignee_ids,
     }: {
       name?: string;
       description?: string;
@@ -278,7 +267,7 @@ export class TaskService {
       priority?: "high" | "medium" | "low";
       start_date?: string;
       end_date?: string;
-      assignee_id?: number | null;
+      assignee_ids?: number[];
     },
   ) {
     try {
@@ -324,23 +313,11 @@ export class TaskService {
           };
         }
 
-        if (assignee_id !== undefined) {
-          if (assignee_id != null) {
-            const assignee = await this.users.findOneById(assignee_id, transaction);
-            if (!assignee) {
-              return {
-                statusCode: statusCodes.NOT_FOUND,
-                message: "Assignee not found",
-                data: null,
-              };
-            }
-            if (assignee.workspace_id !== workspaceId) {
-              return {
-                statusCode: statusCodes.BAD_REQUEST,
-                message: "Assignee must belong to the same workspace",
-                data: null,
-              };
-            }
+        if (assignee_ids !== undefined) {
+          for (const assigneeId of assignee_ids) {
+            const assignee = await this.users.findOneById(assigneeId, transaction);
+            if (!assignee) return { statusCode: statusCodes.NOT_FOUND, message: "Assignee not found", data: null };
+            if (assignee.workspace_id !== workspaceId) return { statusCode: statusCodes.BAD_REQUEST, message: "All assignees must belong to the same workspace", data: null };
           }
         }
 
@@ -379,7 +356,7 @@ export class TaskService {
           task_description: description
             ? description
             : taskRow.task_description,
-          assignee_id: assignee_id !== undefined ? assignee_id : taskRow.assignee_id,
+          assignee_id: assignee_ids !== undefined ? (assignee_ids[0] ?? null) : taskRow.assignee_id,
           status_id: status_id,
           priority: priority !== undefined ? priority : taskRow.priority,
           start_date:
@@ -389,6 +366,7 @@ export class TaskService {
         };
 
         await this.tasks.updateById(id, updatedData, transaction);
+        if (assignee_ids !== undefined) await this.tasks.replaceAssignees(id, assignee_ids, transaction);
         const finalRes = await this.tasks.findOneWithStatusAlias(
           id,
           transaction,

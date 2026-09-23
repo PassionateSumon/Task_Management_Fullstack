@@ -7,7 +7,7 @@ export class UserService {
   async getAllUsers(userId: number, options?: { page?: number; limit?: number; search?: string }) {
     try {
       const { rows: users, count } = await withTransaction(async (transaction) => {
-        return this.users.findAllExceptUserId(userId, options, transaction);
+        return this.users.findAllUsers(userId, options, transaction);
       });
       if (!users) {
         return {

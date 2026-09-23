@@ -10,6 +10,7 @@ export interface Task {
   end_date: string | null;
   assignee_id?: number | null;
   assignee?: { id: number; name: string; email?: string; user_type?: string } | null;
+  assignees?: { id: number; name: string; email?: string; user_type?: string }[];
   status: { id: number; name: string };
   date?: Date; // For view-day mode
   tasks?: any[]; // For view-day mode

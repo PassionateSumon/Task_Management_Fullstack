@@ -12,7 +12,14 @@ const initialState: UserState = {
 export const getWorkspaceUsers = createAsyncThunk("user/getWorkspaceUsers", async (_, { rejectWithValue }) => {
     try {
         const res = await axiosInstance.get('/user/all?page=1&limit=100');
-        return res.data?.data?.data ?? [];
+        const responseData = (res as any)?.data;
+        return Array.isArray(responseData?.data)
+            ? responseData.data
+            : Array.isArray(responseData?.data?.data)
+                ? responseData.data.data
+                : Array.isArray(responseData)
+                    ? responseData
+                    : [];
     } catch (error: any) {
         return rejectWithValue(
             error.response?.data?.message || "Failed to fetch workspace users"

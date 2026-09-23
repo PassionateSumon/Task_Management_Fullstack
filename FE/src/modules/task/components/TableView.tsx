@@ -52,11 +52,22 @@ const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, han
     },
     {
       accessorKey: "assignee.name",
-      header: "Assignee",
-      cell: ({ getValue }) => {
-        const assigneeName = getValue() as string | undefined;
-        return assigneeName ? (
-          <span className="text-xs font-medium text-gray-700">{assigneeName}</span>
+      header: "Assignees",
+      cell: ({ getValue, row }) => {
+        const task = row.original as any;
+        const assignees = task.assignees?.length
+          ? task.assignees
+          : getValue()
+            ? [task.assignee]
+            : [];
+        return assignees.length ? (
+          <div className="flex max-w-[220px] flex-wrap gap-1">
+            {assignees.map((assignee: any) => (
+              <span key={assignee.id} className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-semibold text-indigo-700">
+                {assignee.name}
+              </span>
+            ))}
+          </div>
         ) : (
           <span className="text-[10px] text-gray-300">Unassigned</span>
         );

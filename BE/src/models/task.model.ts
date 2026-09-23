@@ -60,6 +60,12 @@ export default (sequelize: any, DataType: any) => {
       as: "assignee",
       allowNull: true,
     });
+    Task.belongsToMany(models.User, {
+      through: models.TaskAssignee,
+      foreignKey: "task_id",
+      otherKey: "user_id",
+      as: "assignees",
+    });
     Task.belongsTo(models.Status, {
       foreignKey: "status_id",
       as: "status",

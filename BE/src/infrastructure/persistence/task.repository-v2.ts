@@ -53,6 +53,16 @@ export class TaskRepositoryV2 implements ITaskWriter {
     return this.db.Task.create(data, { transaction });
   }
 
+  async replaceAssignees(taskId: number, userIds: number[], transaction?: Transaction) {
+    await this.db.TaskAssignee.destroy({ where: { task_id: taskId }, transaction });
+    if (userIds.length > 0) {
+      await this.db.TaskAssignee.bulkCreate(
+        userIds.map((userId) => ({ task_id: taskId, user_id: userId })),
+        { transaction },
+      );
+    }
+  }
+
   /**
    * Escapes SQL LIKE wildcards (%, _, \) in user-supplied search text so a
    * search for e.g. "50%_off" is treated literally instead of as a wildcard
@@ -109,6 +119,13 @@ export class TaskRepositoryV2 implements ITaskWriter {
       attributes: ["id", "name", "email", "user_type", "workspace_id"],
       required: false,
     };
+    const assigneesInclude: any = {
+      model: this.db.User,
+      as: "assignees",
+      attributes: ["id", "name", "email", "user_type", "workspace_id"],
+      through: { attributes: [] },
+      required: false,
+    };
 
     if (options?.status) {
       statusInclude.where = { name: options.status };
@@ -145,7 +162,7 @@ export class TaskRepositoryV2 implements ITaskWriter {
         "user_id",
         "assignee_id",
       ],
-      include: [statusInclude, assigneeInclude],
+      include: [statusInclude, assigneeInclude, assigneesInclude],
       transaction,
       order,
     };
@@ -178,6 +195,13 @@ export class TaskRepositoryV2 implements ITaskWriter {
           model: this.db.User,
           as: "assignee",
           attributes: ["id", "name", "email", "user_type", "workspace_id"],
+          required: false,
+        },
+        {
+          model: this.db.User,
+          as: "assignees",
+          attributes: ["id", "name", "email", "user_type", "workspace_id"],
+          through: { attributes: [] },
           required: false,
         },
       ],
