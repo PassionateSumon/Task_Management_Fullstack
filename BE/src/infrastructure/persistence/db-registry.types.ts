@@ -9,4 +9,5 @@ export interface DbRegistry {
   Status: any;
   RefreshToken: any;
   Workspace: any;
+  TaskAssignee: any;
 }

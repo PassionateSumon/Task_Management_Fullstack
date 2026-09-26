@@ -36,3 +36,14 @@
   border-bottom: 1px solid #f1f5f9 !important; /* slate-100 */
   background: transparent !important;
 }
+.custom-saas-editor .ck.ck-toolbar {
+  min-height: 44px;
+  padding: 4px 8px !important;
+}
+.custom-saas-editor .ck.ck-button {
+  border-radius: 8px !important;
+}
+.custom-saas-editor .ck-editor__editable_inline {
+  min-height: 145px;
+  padding: 14px 16px !important;
+}
