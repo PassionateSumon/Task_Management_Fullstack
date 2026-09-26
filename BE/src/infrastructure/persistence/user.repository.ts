@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, literal } from "sequelize";
 import type { Transaction } from "sequelize";
 import type { DbRegistry } from "./db-registry.types.js";
 import { USER_TYPE } from "../../common/constants/constants.js";
@@ -93,6 +93,16 @@ export class UserRepository {
     return this.db.User.findAndCountAll(queryOptions);
   }
 
+  /**
+   * Lists every user in the caller's workspace, each carrying the id of their
+   * assigned role.
+   *
+   * The role id is pulled in as a correlated subquery inside the same statement
+   * instead of via a follow-up lookup per row, so a 100-user page costs one
+   * query rather than 101. A subquery is used in preference to a Sequelize
+   * `include` because `UserRole` has a composite primary key and `User` declares
+   * no `hasMany` association for it.
+   */
   async findAllUsers(
     userId: number,
     options?: { page?: number; limit?: number; search?: string },
@@ -116,8 +126,23 @@ export class UserRepository {
       ];
     }
 
+    const userTable = String(this.db.User.getTableName());
+    const userRoleTable = String(this.db.UserRole.getTableName());
+
     const queryOptions: any = {
-      attributes: { exclude: ["password"] },
+      attributes: {
+        // `otp` is a live credential during the password-reset flow and is
+        // never rendered by the team list, so it is not part of a user profile.
+        exclude: ["password", "otp"],
+        include: [
+          [
+            literal(
+              `(SELECT ur.role_id FROM \`${userRoleTable}\` ur WHERE ur.user_id = \`${userTable}\`.id LIMIT 1)`
+            ),
+            "role_id",
+          ],
+        ],
+      },
       where,
       transaction,
       order: [["createdAt", "DESC"]],
@@ -138,6 +163,27 @@ export class UserRepository {
   ): Promise<any | null> {
     return this.db.User.findOne({
       where: { id },
+      attributes: { exclude: ["password"] },
+      transaction,
+    });
+  }
+
+  /**
+   * Tenant-scoped lookup. Returns null when the user belongs to a different
+   * workspace, so a cross-tenant id is indistinguishable from a missing one and
+   * cannot be used to probe for the existence of foreign users.
+   *
+   * `password` is excluded here rather than at the call site: this method is
+   * only ever used to read a profile, so no caller can be trusted to remember
+   * to strip the hash before the row reaches a response body.
+   */
+  async findOneByIdInWorkspace(
+    id: number | string,
+    workspaceId: number,
+    transaction?: Transaction
+  ): Promise<any | null> {
+    return this.db.User.findOne({
+      where: { id, workspace_id: workspaceId },
       attributes: { exclude: ["password"] },
       transaction,
     });

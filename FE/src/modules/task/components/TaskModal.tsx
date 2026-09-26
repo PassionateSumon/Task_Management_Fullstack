@@ -16,8 +16,9 @@ import "ckeditor5/ckeditor5.css";
 
 const TaskModal = ({
   isOpen, onClose, mode, task, statuses,
-  handleEditTask, handleDeleteTask,
+  handleEditTask, handleDeleteTask, permissions,
 }: ExtendedTaskModalProps) => {
+  const { canCreate, canEdit, canDelete } = permissions;
   const emptyForm = {
     name: "", description: "", status: "", priority: "", assignee_ids: [] as string[], start_date: "", end_date: "",
   };
@@ -109,6 +110,16 @@ const TaskModal = ({
   };
 
   const handleSubmit = async () => {
+    /* Defence in depth. The surrounding UI already prevents opening this modal
+       in a mode the user lacks the permission for, so this should be
+       unreachable -- but it is the one place that actually issues the write, so
+       it refuses rather than trusting that a button stayed hidden. */
+    const allowed =
+      mode === "add" ? canCreate : mode === "edit" ? canEdit : false;
+    if (!allowed) {
+      toast.error("You do not have permission to perform this action");
+      return;
+    }
     if (!formData.name || !formData.status) { toast.error("Task name and status are required."); return; }
     if (formData.start_date && formData.end_date && new Date(formData.end_date) < new Date(formData.start_date)) {
       toast.error("Due date cannot be before start date."); return;
@@ -332,7 +343,7 @@ const TaskModal = ({
         {/* Footer */}
         <div className="flex flex-shrink-0 items-center justify-between gap-4 border-t border-slate-100 bg-white px-5 py-4 sm:px-7">
           <div>
-            {(mode === "view" || mode === "edit") && task?.id && (
+            {canDelete && (mode === "view" || mode === "edit") && task?.id && (
               <button
                 type="button"
                 onClick={() => { handleDeleteTask(task.id); onClose(); }}
@@ -349,29 +360,36 @@ const TaskModal = ({
               onClick={handleOnClose}
               className="cursor-pointer rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
             >
-              Cancel
+              {mode === "add" || mode === "edit" ? "Cancel" : "Close"}
             </button>
 
             {mode === "view" ? (
-              <button
-                type="button"
-                onClick={() => task && handleEditTask(task)}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
-              >
-                <Edit3 size={14} /> Edit
-              </button>
+              /* In view mode the only forward action is "Edit", which needs
+                 `task.update`. A viewer gets Close only. */
+              canEdit && (
+                <button
+                  type="button"
+                  onClick={() => task && handleEditTask(task)}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                >
+                  <Edit3 size={14} /> Edit
+                </button>
+              )
             ) : (
-              <button
-                type="button"
-                onClick={handleSubmit} disabled={loading}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {loading ? (
-                  <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</>
-                ) : (
-                  <><Save size={14} />{mode === "add" ? "Create" : "Save"}</>
-                )}
-              </button>
+              /* `canSubmit` is false in "view-day" mode, which is read-only. */
+              (mode === "add" ? canCreate : mode === "edit" ? canEdit : false) && (
+                <button
+                  type="button"
+                  onClick={handleSubmit} disabled={loading}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading ? (
+                    <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving...</>
+                  ) : (
+                    <><Save size={14} />{mode === "add" ? "Create" : "Save"}</>
+                  )}
+                </button>
+              )
             )}
           </div>
         </div>

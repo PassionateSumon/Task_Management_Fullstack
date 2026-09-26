@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type {
   AuthState,
+  ChangePasswordPayload,
   LoginPayload,
   OtpPayload,
   SignupPayload,
@@ -9,8 +10,11 @@ import axiosInstance from "../../../common/utils/AxiosInstance";
 
 const initialState: AuthState = {
   isLoggedIn: false,
+  userId: null,
   email: null,
   role: null,
+  permissions: [],
+  assignedRole: null,
   loading: false,
   error: null,
 };
@@ -29,9 +33,14 @@ export const signup = createAsyncThunk(
 
 export const login = createAsyncThunk(
   "auth/login",
-  async (payload: LoginPayload, { rejectWithValue }) => {
+  async (payload: LoginPayload, { rejectWithValue, dispatch }) => {
     try {
       const res = await axiosInstance.post("/auth/login", payload);
+      // The login response does not carry the permission set. Resolve it
+      // immediately via the existing /auth/me thunk, otherwise the UI would
+      // render with an empty permission list after signing in and hide every
+      // permission-gated control until the next full page load.
+      await dispatch(checkAuthStatus());
       return res;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || "Login failed");
@@ -107,6 +116,28 @@ export const logout = createAsyncThunk(
   }
 );
 
+/**
+ * Self-service password change.
+ *
+ * The backend revokes every existing session on success, so the local session
+ * state is cleared here too rather than waiting for the next request to 401.
+ */
+export const changePassword = createAsyncThunk(
+  "auth/changePassword",
+  async (payload: ChangePasswordPayload, { rejectWithValue }) => {
+    try {
+      await axiosInstance.put("/auth/change-password", payload, {
+        headers: { "X-Skip-Loader": "true" },
+      });
+      return true;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to change password"
+      );
+    }
+  }
+);
+
 const AuthSlice = createSlice({
   name: "auth",
   initialState,
@@ -175,6 +206,15 @@ const AuthSlice = createSlice({
           action.payload?.data?.role ||
           action.payload?.role ||
           null;
+
+        // `/auth/me` is the single place the server resolves the caller's
+        // effective permissions, so this list is always derived, never guessed.
+        const me = action.payload?.data ?? action.payload ?? {};
+        state.permissions = Array.isArray(me.permissions) ? me.permissions : [];
+        state.assignedRole =
+          me.role && typeof me.role === "object" ? me.role : null;
+        state.email = me.user?.email ?? state.email;
+        state.userId = me.user?.id ?? state.userId;
       })
       .addCase(checkAuthStatus.rejected, (state) => {
         state.loading = false;
@@ -217,9 +257,35 @@ const AuthSlice = createSlice({
       .addCase(logout.fulfilled, (state) => {
         state.loading = false;
         state.isLoggedIn = false;
+        state.userId = null;
         state.email = null;
+        state.role = null;
+        state.permissions = [];
+        state.assignedRole = null;
       })
       .addCase(logout.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+      // Change Password
+      .addCase(changePassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(changePassword.fulfilled, (state) => {
+        state.loading = false;
+        // The server revoked every session for this account as part of the
+        // password change, so drop the local session too and send the user to
+        // the login screen instead of letting the next call bounce off a 401.
+        state.isLoggedIn = false;
+        state.userId = null;
+        state.email = null;
+        state.role = null;
+        state.permissions = [];
+        state.assignedRole = null;
+      })
+      .addCase(changePassword.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });

@@ -10,4 +10,8 @@ export interface DbRegistry {
   RefreshToken: any;
   Workspace: any;
   TaskAssignee: any;
+  Role: any;
+  Permission: any;
+  UserRole: any;
+  RolePermission: any;
 }

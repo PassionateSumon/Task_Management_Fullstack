@@ -15,16 +15,20 @@ import GeneralDashboard from "./modules/dashboard/components/GeneralDashboard";
 import NotFound from "./common/components/NotFound";
 import StatusPage from "./modules/status/pages/StatusPage";
 import type { RootState } from "./store/store";
-import InviteUserOrAdmin from "./modules/user/components/InviteUserOrAdmin";
+import TeamPage from "./modules/user/components/TeamPage";
 import Profile from "./modules/user/components/Profile";
 import Landing from "./common/components/Landing";
 import { CustomLoader } from "./common/components/CustomLoader";
+import RolePage from "./modules/role/pages/RolePage";
+import PermissionPage from "./modules/permission/pages/PermissionPage";
+import ChangePassword from "./modules/auth/components/ChangePassword";
+import RequirePermission from "./common/utils/RequirePermission";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
   const [isLoading, setIsLoading] = useState(false);
   const [checkAuth, setCheckAuth] = useState(false);
-  const { isLoggedIn, role } = useSelector((state: RootState) => state.auth);
+  const { isLoggedIn } = useSelector((state: RootState) => state.auth);
   const location = useLocation();
   useEffect(() => {
     if (isLoggedIn) {
@@ -67,12 +71,37 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/home" element={<HomeLayout />}>
             <Route path="task" element={<TaskPage />} />
-            {role === "admin" && <Route path="status" element={<StatusPage />} />}
-            <Route path="invite" element={<InviteUserOrAdmin />} />
-            <Route path="dashboard" element={<AdminDashboard />} />
-            <Route path="dashboard/me" element={<GeneralDashboard />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="change-password" element={<ChangePassword />} />
+            <Route path="dashboard/me" element={<GeneralDashboard />} />
             <Route index element={<Navigate to="task" replace />} />
+
+            {/* Status administration */}
+            <Route element={<RequirePermission anyOf={["status.view"]} />}>
+              <Route path="status" element={<StatusPage />} />
+            </Route>
+
+            {/* Admin analytics */}
+            <Route
+              element={<RequirePermission anyOf={["dashboard.view.admin"]} />}
+            >
+              <Route path="dashboard" element={<AdminDashboard />} />
+            </Route>
+
+            {/* Workspace member management */}
+            <Route element={<RequirePermission anyOf={["user.view"]} />}>
+              <Route path="team" element={<TeamPage />} />
+            </Route>
+
+            {/* Role management */}
+            <Route element={<RequirePermission anyOf={["role.view"]} />}>
+              <Route path="roles" element={<RolePage />} />
+            </Route>
+
+            {/* Permission catalogue */}
+            <Route element={<RequirePermission anyOf={["permission.view"]} />}>
+              <Route path="permissions" element={<PermissionPage />} />
+            </Route>
           </Route>
         </Route>
 

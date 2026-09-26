@@ -39,7 +39,14 @@ export const taskIdParamSchema = Joi.object({
 
 export const taskGetAllParamSchema = Joi.object({
   viewType: Joi.string().valid("kanban", "compact", "calendar", "table").required(),
-  id: Joi.string().allow(null, ""),
+  // NOTE: the former `id` query param is deliberately gone.
+  //
+  // It was read as "restrict the board to this user's tasks" and the service
+  // then post-filtered by `task.user_id === id` for admins, leaving every other
+  // caller with `{}`. It also meant the board was scoped by a CLIENT-supplied
+  // id, which is exactly the kind of value that must never decide tenancy.
+  // Visibility is now workspace-wide and derived server-side, so there is
+  // nothing for this parameter to do.
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).default(10),
   search: Joi.string().allow("", null),

@@ -73,7 +73,7 @@ const Auth: FC<AuthProps> = ({ from }) => {
     if (Object.values(newErrors).some(e => e)) return;
 
     const action = from === "signup"
-      ? signup({ name: formData.name!, email: formData.email!, password: formData.password!, user_type: formData.user_type })
+      ? signup({ name: formData.name!, email: formData.email!, password: formData.password!, user_type: "admin" })
       : login({ emailOrUsername: formData.emailOrUsername, password: formData.password });
 
     const result = await dispatch(action as any);
@@ -213,7 +213,7 @@ const Auth: FC<AuthProps> = ({ from }) => {
               {renderInput("Password", "password", "password", Lock)}
 
               {/* Role selector */}
-              {from === "signup" && (
+              {/* {from === "signup" && (
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
                     Role
@@ -235,7 +235,7 @@ const Auth: FC<AuthProps> = ({ from }) => {
                     ))}
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Submit */}
               <button

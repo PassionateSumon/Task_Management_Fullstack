@@ -78,7 +78,7 @@ export class TaskService {
         const whereClause = {
           task_name: name,
           status_id,
-          user_id: userId,
+          workspace_id: workspaceId,
         };
         const existed = await this.tasks.findDuplicate(
           whereClause,
@@ -95,7 +95,10 @@ export class TaskService {
         const wrappedInput: Record<string, unknown> = {
           task_name: name,
           task_description: description ? description : null,
+          // Who created it (kept for audit + the duplicate/author fields).
           user_id: userId,
+          // Which workspace owns it -- the tenant key the board query filters on.
+          workspace_id: workspaceId,
           assignee_id: assignee_ids[0] ?? null,
           status_id: status_id.id,
           priority: priority ? priority : null,
@@ -128,11 +131,25 @@ export class TaskService {
     }
   }
 
+  /**
+   * Every task in the caller's workspace.
+   *
+   * `userId` is used ONLY to derive the caller's workspace server-side. It never
+   * scopes the result set. The previous version took a `reqUserId` + `roleId`,
+   * fetched `WHERE user_id = caller`, and then post-filtered the result by
+   * creator for admins -- so a member got `{}` and an admin got only their own
+   * tasks. Neither branch reflected assignment or workspace membership, which is
+   * why assigned tasks never reached the assignee's board.
+   *
+   * `roleId` is retained in the signature (and ignored) so the controller and any
+   * other caller keep working; the `task.view` check is now enforced by
+   * `PermissionGuard` on the route, which is the single place it happens.
+   */
   async getAllTasks(
     viewType: "kanban" | "compact" | "calendar" | "table" = "compact",
     userId: number,
-    roleId: string,
-    reqUserId?: string | null,
+    _roleId?: string,
+    _reqUserId?: string | null,
     options?: {
       page?: number;
       limit?: number;
@@ -147,51 +164,55 @@ export class TaskService {
   ) {
     try {
       if (viewType !== "table") {
+        // Only the table view paginates. For the board views returning every
+        // task is intentional: a kanban column that silently omits tasks
+        // because they fell past a page limit is worse than a longer payload.
         options = {
           ...options,
           page: undefined,
           limit: undefined,
         };
       }
+
+      const workspaceId = await this.users.findWorkspaceIdByUserId(userId);
+      if (workspaceId == null) {
+        return {
+          statusCode: statusCodes.PERMISSION_DENIED,
+          message: "No workspace assigned to this account",
+          data: null,
+        };
+      }
+
       const { rows: tasks, count } = await withTransaction(
         async (transaction) => {
-          return this.tasks.findAllForUser(
-            reqUserId ? reqUserId : userId,
-            options,
-            transaction,
-          );
+          return this.tasks.findAllInWorkspace(workspaceId, options, transaction);
         },
       );
       if (!tasks)
         return { statusCode: statusCodes.NOT_FOUND, message: "Tasks not found", data: null };
 
-      let result: unknown = {};
+      let result: unknown;
 
-      if (reqUserId === null || reqUserId === undefined) {
-        if (viewType === "kanban") {
-          result = tasks.reduce((acc: any, task: any) => {
-            const status = task.status.name;
-            if (!acc[status]) {
-              acc[status] = [];
-            }
-            acc[status].push(task);
-            return acc;
-          }, {});
-        } else if (viewType === "calendar") {
-          result = tasks.reduce((acc: any, task: any) => {
-            const date = task.start_date ? task.start_date : "no-date";
-            if (!acc[date]) {
-              acc[date] = [];
-            }
-            acc[date].push(task);
-            return acc;
-          }, {});
-        } else {
-          result = tasks;
-        }
+      if (viewType === "kanban") {
+        result = tasks.reduce((acc: any, task: any) => {
+          const status = task.status.name;
+          if (!acc[status]) {
+            acc[status] = [];
+          }
+          acc[status].push(task);
+          return acc;
+        }, {});
+      } else if (viewType === "calendar") {
+        result = tasks.reduce((acc: any, task: any) => {
+          const date = task.start_date ? task.start_date : "no-date";
+          if (!acc[date]) {
+            acc[date] = [];
+          }
+          acc[date].push(task);
+          return acc;
+        }, {});
       } else {
-        if (roleId === "admin")
-          result = tasks.filter((task: any) => task.user_id === reqUserId);
+        result = tasks;
       }
 
       let meta: any = {};
@@ -215,7 +236,8 @@ export class TaskService {
           meta,
         },
       };
-    } catch {
+    } catch (err: any) {
+      console.error("Error in getAllTasks:", err);
       return {
         statusCode: statusCodes.SERVER_ISSUE,
         message: "Internal server error",
@@ -224,10 +246,29 @@ export class TaskService {
     }
   }
 
-  async getSingleTask({ id }: { id: number }) {
+  /**
+   * `callerId` is the authenticated user, used to derive the caller's workspace
+   * server-side. The task id may only address a task inside that workspace.
+   *
+   * The previous version looked the task up by bare id, so any authenticated
+   * user could read a task in any workspace by guessing an id -- confirmed live
+   * (a workspace-2 admin read a workspace-5 task). A cross-workspace read now
+   * returns the same 404 as a genuinely missing task, so this endpoint does not
+   * confirm the existence of other tenants' ids.
+   */
+  async getSingleTask({ id }: { id: number }, callerId: number) {
     try {
+      const workspaceId = await this.users.findWorkspaceIdByUserId(callerId);
+      if (workspaceId == null) {
+        return {
+          statusCode: statusCodes.PERMISSION_DENIED,
+          message: "No workspace assigned to this account",
+          data: null,
+        };
+      }
+
       const result = await withTransaction(async (transaction) => {
-        return this.tasks.findOneWithStatus(id, transaction);
+        return this.tasks.findOneWithStatus(id, workspaceId, transaction);
       });
       if (!result) {
         return {
@@ -269,11 +310,26 @@ export class TaskService {
       end_date?: string;
       assignee_ids?: number[];
     },
+    callerId: number,
   ) {
     try {
+      // Resolve the CALLER's workspace, not the task creator's. Deriving tenancy
+      // from `taskRow.user_id` meant the task decided which tenant the editor
+      // belonged to, so any authenticated user could edit a task in any workspace
+      // -- confirmed live (a workspace-2 admin renamed a workspace-5 task).
+      const callerWorkspaceId = await this.users.findWorkspaceIdByUserId(callerId);
+      if (callerWorkspaceId == null) {
+        return {
+          statusCode: statusCodes.PERMISSION_DENIED,
+          message: "No workspace assigned to this account",
+          data: null,
+        };
+      }
+
       return await withTransaction(async (transaction) => {
         const taskRow = await this.tasks.findByIdWithStatusJoin(
           id,
+          callerWorkspaceId,
           transaction,
         );
         if (!taskRow) {
@@ -301,17 +357,10 @@ export class TaskService {
           }
         }
 
-        const workspaceId = await this.users.findWorkspaceIdByUserId(
-          taskRow.user_id,
-          transaction,
-        );
-        if (workspaceId == null) {
-          return {
-            statusCode: statusCodes.BAD_REQUEST,
-            message: "Task owner has no workspace assigned",
-            data: null,
-          };
-        }
+        // The caller's workspace, already resolved above and already proven to
+        // own this task. Reusing it keeps the assignee and status lookups inside
+        // the same tenant as the task being edited.
+        const workspaceId = callerWorkspaceId;
 
         if (assignee_ids !== undefined) {
           for (const assigneeId of assignee_ids) {
@@ -365,15 +414,16 @@ export class TaskService {
           completed_date,
         };
 
-        await this.tasks.updateById(id, updatedData, transaction);
+        await this.tasks.updateById(id, workspaceId, updatedData, transaction);
         if (assignee_ids !== undefined) await this.tasks.replaceAssignees(id, assignee_ids, transaction);
         const finalRes = await this.tasks.findOneWithStatusAlias(
           id,
+          workspaceId,
           transaction,
         );
         return {
           statusCode: statusCodes.SUCCESS,
-          message: "Status updated successfully",
+          message: "Task updated successfully",
           data: finalRes,
         };
       });
@@ -386,10 +436,24 @@ export class TaskService {
     }
   }
 
-  async deleteTask(id: number) {
+  /**
+   * Scoped to the caller's workspace. The previous bare-`id` lookup let any
+   * authenticated user delete any task in any workspace -- confirmed live (a
+   * workspace-2 admin deleted a workspace-5 task).
+   */
+  async deleteTask(id: number, callerId: number) {
     try {
+      const workspaceId = await this.users.findWorkspaceIdByUserId(callerId);
+      if (workspaceId == null) {
+        return {
+          statusCode: statusCodes.PERMISSION_DENIED,
+          message: "No workspace assigned to this account",
+          data: null,
+        };
+      }
+
       return await withTransaction(async (transaction) => {
-        const task = await this.tasks.findById(id, transaction);
+        const task = await this.tasks.findById(id, workspaceId, transaction);
         if (!task) {
           return {
             statusCode: statusCodes.NOT_FOUND,
@@ -397,7 +461,7 @@ export class TaskService {
             data: null,
           };
         }
-        await this.tasks.destroyById(id, transaction);
+        await this.tasks.destroyById(id, workspaceId, transaction);
         return {
           statusCode: statusCodes.SUCCESS,
           message: "Task deleted successfully",

@@ -16,8 +16,17 @@ export const loginPayloadSchema = Joi.object({
 export const resetPasswordPayloadSchema = Joi.object({
   emailOrUsername: Joi.string().trim().required(),
   tempPassword: Joi.string().required(),
-  /** Client may send a hashed password; do not apply plain-text pattern here. */
-  newPassword: Joi.string().min(10).max(200).required(),
+  /** Plaintext: the server hashes it. See PasswordHasher. */
+  newPassword: strictPassword.required(),
+});
+
+export const changePasswordPayloadSchema = Joi.object({
+  currentPassword: Joi.string().required(),
+  newPassword: strictPassword.required(),
+  confirmNewPassword: Joi.string()
+    .required()
+    .valid(Joi.ref("newPassword"))
+    .messages({ "any.only": "Passwords do not match" }),
 });
 
 export const otpSendPayloadSchema = Joi.object({

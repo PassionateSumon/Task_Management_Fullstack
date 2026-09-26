@@ -12,6 +12,7 @@ import {
   X, Search, ChevronDown, SlidersHorizontal,
 } from "lucide-react";
 import { useDebounce } from "../../../common/utils/CustomDebounce";
+import { hasAnyPermission } from "../../../common/utils/permissions";
 
 const getStatusStyle = (status: string) => {
   const styles: any = {
@@ -147,10 +148,44 @@ const TaskPage = () => {
     (state: RootState) => state.task
   );
   const { statuses } = useSelector((state: RootState) => state.status);
+  const permissions = useSelector((state: RootState) => state.auth.permissions);
+
+  /**
+   * Capability flags, resolved once here and threaded down to the views and
+   * the modal so every task affordance is gated from a single source.
+   *
+   * `task.view` is deliberately NOT one of these: the board itself is only
+   * reachable through the `task.view`-gated route in `App.tsx`, and every
+   * surface below is a *mutation*. Someone who can view tasks but not change
+   * them should see a read-only board, not buttons that only fail on click.
+   *
+   * These flags are UX only. The backend is the authority -- though note the
+   * task routes currently carry no `PermissionGuard`, so this gating is what
+   * stands between a viewer and the write endpoints today.
+   */
+  const taskPermissions = {
+    canCreate: hasAnyPermission(permissions, "task.create"),
+    canEdit: hasAnyPermission(permissions, "task.update"),
+    canDelete: hasAnyPermission(permissions, "task.delete"),
+  };
 
   const [modalState, setModalState] = useState<{
     isOpen: boolean; mode: "add" | "view" | "edit" | "view-day"; task: any | null;
   }>({ isOpen: false, mode: "add", task: null });
+
+  /**
+   * Single entry point for opening the modal, so an unsupported mode can never
+   * be reached even if a stale reference to a hidden button is still held
+   * somewhere in a child view. Falls back to read-only "view".
+   */
+  const openModal = (
+    mode: "add" | "view" | "edit" | "view-day",
+    task: any | null = null
+  ) => {
+    if (mode === "add" && !taskPermissions.canCreate) return;
+    if (mode === "edit" && !taskPermissions.canEdit) return;
+    setModalState({ isOpen: true, mode, task });
+  };
 
   const [activeView, setActiveView] = useState<"kanban" | "collapsed" | "table">("kanban");
   const [expandedStatuses, setExpandedStatuses] = useState<{ [key: string]: boolean }>({});
@@ -212,12 +247,14 @@ const TaskPage = () => {
             Manage and track your team's progress in real-time.
           </p>
         </div>
-        <button
-          onClick={() => setModalState({ isOpen: true, mode: "add", task: null })}
-          className="inline-flex items-center gap-1.5 bg-[#5A67D8] hover:bg-[#434190] text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer active:scale-95 shadow-md shadow-indigo-100"
-        >
-          <Plus size={15} /> Add Task
-        </button>
+        {taskPermissions.canCreate && (
+          <button
+            onClick={() => openModal("add")}
+            className="inline-flex items-center gap-1.5 bg-[#5A67D8] hover:bg-[#434190] text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer active:scale-95 shadow-md shadow-indigo-100"
+          >
+            <Plus size={15} /> Add Task
+          </button>
+        )}
       </div>
 
       {/* ── Toolbar ── */}
@@ -328,32 +365,35 @@ const TaskPage = () => {
             tasks={tasks} loading={loading} error={error}
             statuses={statuses.map((s: any) => s.name)}
             getStatusStyle={getStatusStyle}
-            handleOpenModal={(m, t) => setModalState({ isOpen: true, mode: m, task: t })}
-            handleEditTask={(t) => setModalState({ isOpen: true, mode: "edit", task: t })}
+            handleOpenModal={openModal}
+            handleEditTask={(t) => openModal("edit", t)}
             handleDeleteTask={(id) => dispatch(deleteTask(id))}
             dispatch={dispatch}
+            permissions={taskPermissions}
           />
         )}
         {activeView === "collapsed" && (
           <CollapsedView
             tasks={tasks} loading={loading} error={error}
             getStatusStyle={getStatusStyle}
-            handleOpenModal={(m, t) => setModalState({ isOpen: true, mode: m, task: t })}
-            handleEditTask={(t) => setModalState({ isOpen: true, mode: "edit", task: t })}
+            handleOpenModal={openModal}
+            handleEditTask={(t) => openModal("edit", t)}
             handleDeleteTask={(id) => dispatch(deleteTask(id))}
             expandedStatuses={expandedStatuses} expandedTasks={expandedTasks}
             toggleStatus={(s) => setExpandedStatuses(p => ({ ...p, [s]: !p[s] }))}
             toggleTask={(id) => setExpandedTasks(p => ({ ...p, [id]: !p[id] }))}
             dispatch={dispatch}
+            permissions={taskPermissions}
           />
         )}
         {activeView === "table" && (
           <TableView
             tasks={Array.isArray(tasks) ? tasks : []} loading={loading} error={error}
             getStatusStyle={getStatusStyle}
-            handleOpenModal={(m, t) => setModalState({ isOpen: true, mode: m, task: t })}
-            handleEditTask={(t) => setModalState({ isOpen: true, mode: "edit", task: t })}
+            handleOpenModal={openModal}
+            handleEditTask={(t) => openModal("edit", t)}
             handleDeleteTask={(id) => dispatch(deleteTask(id))}
+            permissions={taskPermissions}
             sortBy={sortBy}
             sortOrder={sortOrder || undefined}
             onSort={(field) => {
@@ -422,9 +462,10 @@ const TaskPage = () => {
         mode={modalState.mode} task={modalState.task}
         statuses={statuses.map((s: any) => s.name)}
         activeView={activeView}
-        handleEditTask={(t) => setModalState({ isOpen: true, mode: "edit", task: t })}
+        handleEditTask={(t) => openModal("edit", t)}
         handleDeleteTask={(id) => dispatch(deleteTask(id))}
         dispatch={dispatch}
+        permissions={taskPermissions}
       />
     </div>
   );

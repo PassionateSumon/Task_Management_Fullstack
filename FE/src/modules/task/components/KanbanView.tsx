@@ -17,11 +17,16 @@ const priorityConfig: Record<string, { label: string; cls: string }> = {
 
 const KanbanView = ({
   tasks, loading, error, getStatusStyle, handleOpenModal,
-  handleEditTask, handleDeleteTask, dispatch, statuses,
+  handleEditTask, handleDeleteTask, dispatch, statuses, permissions,
 }: ExtendedKanbanViewProps) => {
   const [hoveredTask, setHoveredTask] = useState<string | null>(null);
+  const { canEdit, canDelete } = permissions;
 
   const onDragEnd = (result: DropResult) => {
+    // Dropping a card into another column writes that task's status, which is a
+    // `task.update`. Without this a view-only user could still mutate tasks by
+    // dragging, even though the edit and delete buttons are hidden.
+    if (!canEdit) return;
     const { source, destination, draggableId } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
@@ -94,7 +99,15 @@ const KanbanView = ({
                           const pCfg = priorityConfig[task.priority?.toLowerCase()] ?? null;
 
                           return (
-                            <Draggable key={draggableId} draggableId={draggableId} index={index}>
+                            <Draggable
+                              key={draggableId}
+                              draggableId={draggableId}
+                              index={index}
+                              /* A card without `task.update` must not be
+                                 draggable, or the board would still let a
+                                 view-only user change a task's status. */
+                              isDragDisabled={!canEdit}
+                            >
                               {(provided, snapshot) => (
                                 <div
                                   ref={provided.innerRef}
@@ -105,7 +118,14 @@ const KanbanView = ({
                                       : "border-gray-100 hover:border-gray-200 hover:shadow-sm"
                                     }`}
                                   style={{
-                                    cursor: snapshot.isDragging ? "grabbing" : "grab",
+                                    /* No grab cursor when the card is not
+                                       draggable, so the affordance matches the
+                                       permission. */
+                                    cursor: !canEdit
+                                      ? "pointer"
+                                      : snapshot.isDragging
+                                        ? "grabbing"
+                                        : "grab",
                                     ...provided.draggableProps.style,
                                   }}
                                   onMouseEnter={() => setHoveredTask(draggableId)}
@@ -117,20 +137,24 @@ const KanbanView = ({
                                     <p className="text-sm font-semibold text-gray-800 leading-snug line-clamp-2">
                                       {task.task_name || "Unnamed Task"}
                                     </p>
-                                    {isHovered && (
+                                    {isHovered && (canEdit || canDelete) && (
                                       <div className="flex gap-1 flex-shrink-0">
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}
-                                          className="p-1 rounded-md text-gray-400 hover:text-[#5A67D8] hover:bg-indigo-50 transition-colors"
-                                        >
-                                          <Edit3 size={13} />
-                                        </button>
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
-                                          className="p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                        >
-                                          <Trash2 size={13} />
-                                        </button>
+                                        {canEdit && (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handleEditTask(task); }}
+                                            className="p-1 rounded-md text-gray-400 hover:text-[#5A67D8] hover:bg-indigo-50 transition-colors cursor-pointer"
+                                          >
+                                            <Edit3 size={13} />
+                                          </button>
+                                        )}
+                                        {canDelete && (
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
+                                            className="p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                                          >
+                                            <Trash2 size={13} />
+                                          </button>
+                                        )}
                                       </div>
                                     )}
                                   </div>

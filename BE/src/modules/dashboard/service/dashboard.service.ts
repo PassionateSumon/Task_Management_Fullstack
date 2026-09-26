@@ -164,11 +164,32 @@ export class DashboardService {
     }
   }
 
+  /**
+   * Personal dashboard for the caller.
+   *
+   * WORKSPACE-scoped, and it must stay that way. The board is workspace-wide, so
+   * a dashboard counting `WHERE user_id = caller` reported 0 tasks for a member
+   * whose board listed 12 -- the summary contradicted the page it summarised.
+   * Both now read the same tenant, resolved server-side from the caller's own
+   * user row; no client input participates in the tenancy decision.
+   *
+   * Authorization (`task.view`) is enforced by `PermissionGuard` on the route,
+   * same as the board it mirrors. This method does not re-check it.
+   */
   async getDashboardForUser(userId: number) {
     try {
+      const workspaceId = await this.users.findWorkspaceIdByUserId(userId);
+      if (workspaceId == null) {
+        return {
+          statusCode: statusCodes.PERMISSION_DENIED,
+          message: "No workspace assigned to this account",
+          data: null,
+        };
+      }
+
       return await withTransaction(async (transaction) => {
-        const tasks = await this.tasks.findAllForUserWithStatus(
-          userId,
+        const tasks = await this.tasks.findAllInWorkspaceWithStatus(
+          workspaceId,
           transaction
         );
         const isDoneLike = (s: any) =>
@@ -192,14 +213,16 @@ export class DashboardService {
             !isDoneLike(task.status)
         ).length;
 
-        const tasksByStatus = await this.tasks.findGroupedByStatusForUser(
-          userId,
-          transaction
-        );
-        const tasksByPriority = await this.tasks.findGroupedByPriorityForUser(
-          userId,
-          transaction
-        );
+        const tasksByStatus =
+          await this.tasks.findGroupedByStatusInWorkspace(
+            workspaceId,
+            transaction
+          );
+        const tasksByPriority =
+          await this.tasks.findGroupedByPriorityInWorkspace(
+            workspaceId,
+            transaction
+          );
 
         return {
           statusCode: statusCodes.SUCCESS,

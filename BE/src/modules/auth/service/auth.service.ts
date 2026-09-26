@@ -6,19 +6,27 @@ import {
   signupPayload,
 } from "../../../common/interfaces/User.interface.js";
 import { JWTUtil } from "../../../common/utils/JWTUtils.js";
-import { CryptoUtil } from "../../../common/utils/Crypto.js";
+import { PasswordHasher } from "../../../common/utils/PasswordHasher.js";
 import { withTransaction } from "../../../common/utils/transaction.js";
+import {
+  ADMIN_SYSTEM_ROLE_NAME,
+  DEFAULT_SYSTEM_ROLE_NAME,
+} from "../../../common/constants/permissions.js";
 import type { UserRepository } from "../../../infrastructure/persistence/user.repository.js";
 import type { RefreshTokenRepository } from "../../../infrastructure/persistence/refresh-token.repository.js";
 import type { WorkspaceRepository } from "../../../infrastructure/persistence/workspace.repository.js";
 import type { StatusRepository } from "../../../infrastructure/persistence/status.repository.js";
+import type { RoleRepository } from "../../../infrastructure/persistence/role.repository.js";
+import type { PermissionRepository } from "../../../infrastructure/persistence/permission.repository.js";
 
 export class AuthService {
   constructor(
     private readonly users: UserRepository,
     private readonly refreshTokens: RefreshTokenRepository,
     private readonly workspaces: WorkspaceRepository,
-    private readonly statuses: StatusRepository
+    private readonly statuses: StatusRepository,
+    private readonly roles: RoleRepository,
+    private readonly permissions: PermissionRepository
   ) {}
 
   async signup({
@@ -44,7 +52,7 @@ export class AuthService {
           user_type = "admin";
         }
 
-        const hashedPassword = CryptoUtil.hashPassword(password, "10");
+        const hashedPassword = await PasswordHasher.hash(password);
 
         const workspace = await this.workspaces.create(
           { name: `${username}'s workspace` },
@@ -75,6 +83,27 @@ export class AuthService {
         }
 
         await this.statuses.seedDefaultsForWorkspace(workspace.id, transaction);
+
+        // A brand-new workspace needs its system roles before anyone can hold
+        // one, otherwise the user would resolve to zero permissions.
+        await this.roles.seedDefaultsForWorkspace(workspace.id, transaction);
+
+        const seededRoleName =
+          user_type === "admin"
+            ? ADMIN_SYSTEM_ROLE_NAME
+            : DEFAULT_SYSTEM_ROLE_NAME;
+        const seededRole = await this.roles.findOneByNameInWorkspace(
+          seededRoleName,
+          workspace.id,
+          transaction
+        );
+        if (seededRole) {
+          await this.roles.assignRoleToUser(
+            newUser.id,
+            seededRole.id,
+            transaction
+          );
+        }
 
         return {
           statusCode: 200,
@@ -120,9 +149,12 @@ export class AuthService {
           };
         }
 
-        const hashedInputPassword = CryptoUtil.hashPassword(password, "10");
-
-        const isPasswordMatch = hashedInputPassword === isExistUser.password;
+        // Accepts both the current bcrypt format and the legacy
+        // `sha256(password + "10")` digests so existing accounts keep working.
+        const isPasswordMatch = await PasswordHasher.verify(
+          password,
+          isExistUser.password
+        );
 
         if (!isPasswordMatch) {
           return {
@@ -130,6 +162,18 @@ export class AuthService {
             message: "Invalid password",
             data: null,
           };
+        }
+
+        // Transparent, self-healing upgrade: the plaintext is in hand right now,
+        // so a legacy digest can be replaced with bcrypt at no extra cost to the
+        // user and no forced password reset.
+        if (PasswordHasher.needsRehash(isExistUser.password)) {
+          const upgraded = await PasswordHasher.hash(password);
+          await this.users.updateById(
+            isExistUser.id,
+            { password: upgraded },
+            transaction
+          );
         }
 
         const accessToken = JWTUtil.generateAccessToken(
@@ -335,7 +379,14 @@ export class AuthService {
           };
         }
 
-        const isPasswordMatch = tempPassword === isExistUser.password;
+        // Verified through the format-agnostic verifier so this works for both
+        // bcrypt digests and the legacy `sha256(password + "10")` rows. The old
+        // raw `===` comparison could only ever match a literal digest, i.e. it
+        // was effectively unreachable for real credentials.
+        const isPasswordMatch = await PasswordHasher.verify(
+          tempPassword,
+          isExistUser.password
+        );
 
         if (!isPasswordMatch) {
           return {
@@ -345,9 +396,14 @@ export class AuthService {
           };
         }
 
+        // Hashing is a server-side responsibility. The client used to send a
+        // client-side hash, which stored a password-equivalent unsalted digest
+        // and was incompatible with server-side bcrypt.
+        const hashedNewPassword = await PasswordHasher.hash(newPassword);
+
         await this.users.updateById(
           isExistUser.id,
-          { password: newPassword, is_reset_password: true },
+          { password: hashedNewPassword, is_reset_password: true },
           transaction
         );
 
@@ -385,6 +441,18 @@ export class AuthService {
           };
         }
 
+        const role = await this.roles.findRoleForUserInWorkspace(
+          userId,
+          user.workspace_id,
+          transaction
+        );
+
+        const permissionNames = await this.permissions.resolvePermissionNamesForUser(
+          userId,
+          user.workspace_id,
+          transaction
+        );
+
         return {
           statusCode: 200,
           message: "User fetched successfully",
@@ -399,6 +467,16 @@ export class AuthService {
               isActive: user.isActive,
               isOtpVerified: user.isOtpVerified,
             },
+            // Effective permissions are returned once here so the client can
+            // hide what it cannot do. The server remains the source of truth.
+            role: role
+              ? {
+                  id: role.id,
+                  name: role.name,
+                  is_system: Boolean(role.is_system),
+                }
+              : null,
+            permissions: [...permissionNames],
           },
         };
       });
@@ -453,6 +531,113 @@ export class AuthService {
         message: result.message,
         data: {},
       };
+    } catch (err: any) {
+      return {
+        statusCode: 500,
+        message: err.message || "Internal server error",
+        data: null,
+      };
+    }
+  }
+
+  /**
+   * Authenticated self-service password change.
+   *
+   * Session handling: the existing revocation primitive is reused rather than
+   * introducing new infrastructure. `lastLogoutAt` is bumped and every refresh
+   * token row is destroyed, which invalidates BOTH the current access token (the
+   * cookie validator rejects `iat <= lastLogoutAt`) and any refresh token. The
+   * trade-off is deliberate: the caller must sign in again. The alternative --
+   * keeping the session alive -- would leave a token that outlives the
+   * credential it was minted from.
+   *
+   * `userId` comes from the validated session only. There is no path here that
+   * accepts a user id from the client, so a user can never change another
+   * user's password.
+   */
+  async changePassword(
+    userId: number,
+    payload: {
+      currentPassword: string;
+      newPassword: string;
+      confirmNewPassword: string;
+    },
+    h: ResponseToolkit
+  ) {
+    const { currentPassword, newPassword, confirmNewPassword } = payload;
+
+    try {
+      const result = await withTransaction(async (transaction) => {
+        const user = await this.users.findByPk(userId, transaction);
+        if (!user) {
+          return {
+            statusCode: 401,
+            message: "Authentication required",
+            data: null,
+          };
+        }
+
+        if (!user.isActive) {
+          return {
+            statusCode: 403,
+            message: "Account is inactive",
+            data: null,
+          };
+        }
+
+        const isCurrentPasswordValid = await PasswordHasher.verify(
+          currentPassword,
+          user.password
+        );
+        if (!isCurrentPasswordValid) {
+          // Deliberately does not distinguish "wrong password" from anything
+          // else, and never echoes the stored hash.
+          return {
+            statusCode: 400,
+            message: "Current password is incorrect",
+            data: null,
+          };
+        }
+
+        if (newPassword === currentPassword) {
+          return {
+            statusCode: 400,
+            message: "New password must be different from the current password",
+            data: null,
+          };
+        }
+
+        const hashedNewPassword = await PasswordHasher.hash(newPassword);
+
+        await this.users.updateById(
+          userId,
+          { password: hashedNewPassword, is_reset_password: false },
+          transaction
+        );
+
+        // Revoke every existing session for this account.
+        await this.users.updateById(
+          userId,
+          { lastLogoutAt: new Date() },
+          transaction
+        );
+        await this.refreshTokens.destroyByUserId(userId, transaction);
+
+        return {
+          statusCode: 200,
+          message: "Password changed successfully",
+          data: null,
+        };
+      });
+
+      if (result.statusCode === 200) {
+        // Drop the now-revoked cookies so the browser does not keep sending
+        // tokens that will be rejected on the next request.
+        h.unstate("accessToken", { path: "/" });
+        h.unstate("refreshToken", { path: "/" });
+      }
+
+      return result;
     } catch (err: any) {
       return {
         statusCode: 500,

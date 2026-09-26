@@ -12,8 +12,10 @@ const priorityConfig: Record<string, { label: string; cls: string }> = {
 const CollapsedView = ({
   tasks, loading, error, getStatusStyle, handleOpenModal,
   handleEditTask, handleDeleteTask, expandedStatuses, expandedTasks,
-  toggleStatus, toggleTask, dispatch,
+  toggleStatus, toggleTask, dispatch, permissions,
 }: CollapsedViewProps) => {
+  const { canEdit, canDelete } = permissions;
+
   const flattenedTasks = !Array.isArray(tasks)
     ? Object.values(tasks).flat()
     : tasks;
@@ -26,6 +28,9 @@ const CollapsedView = ({
   }, {});
 
   const onDragEnd = (result: DropResult) => {
+    // Reordering between status groups writes `status`, i.e. a `task.update`.
+    // Hiding the buttons is not enough on its own.
+    if (!canEdit) return;
     const { source, destination, draggableId } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
@@ -88,7 +93,14 @@ const CollapsedView = ({
                             {statusTasks.map((task: any, index: number) => {
                               const pCfg = priorityConfig[task.priority?.toLowerCase()] ?? null;
                               return (
-                                <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
+                                <Draggable
+                                  key={task.id}
+                                  draggableId={task.id.toString()}
+                                  index={index}
+                                  /* Without `task.update` a row must not be
+                                     draggable between status groups. */
+                                  isDragDisabled={!canEdit}
+                                >
                                   {(provided, snapshot) => (
                                     <div
                                       ref={provided.innerRef}
@@ -138,20 +150,26 @@ const CollapsedView = ({
                                               {task.end_date.split("T")[0]}
                                             </div>
                                           )}
-                                          <div className="flex gap-1.5 justify-end">
-                                            <button
-                                              onClick={() => handleEditTask(task)}
-                                              className="p-1.5 rounded-md text-gray-400 hover:text-[#5A67D8] hover:bg-indigo-50 transition-colors"
-                                            >
-                                              <Edit3 size={13} />
-                                            </button>
-                                            <button
-                                              onClick={() => handleDeleteTask(task.id)}
-                                              className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                            >
-                                              <Trash2 size={13} />
-                                            </button>
-                                          </div>
+                                          {(canEdit || canDelete) && (
+                                            <div className="flex gap-1.5 justify-end">
+                                              {canEdit && (
+                                                <button
+                                                  onClick={() => handleEditTask(task)}
+                                                  className="p-1.5 rounded-md text-gray-400 hover:text-[#5A67D8] hover:bg-indigo-50 transition-colors cursor-pointer"
+                                                >
+                                                  <Edit3 size={13} />
+                                                </button>
+                                              )}
+                                              {canDelete && (
+                                                <button
+                                                  onClick={() => handleDeleteTask(task.id)}
+                                                  className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                                                >
+                                                  <Trash2 size={13} />
+                                                </button>
+                                              )}
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                     </div>

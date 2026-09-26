@@ -40,7 +40,11 @@ export const getAllTasks = createAsyncThunk(
   async (
     payload: {
       viewType?: "kanban" | "compact" | "calendar" | "table";
-      id?: number | null;
+      /**
+       * Removed. The board is workspace-wide and the backend no longer accepts a
+       * user-scoped `id` filter -- it was the parameter that reduced the board to
+       * "tasks created by this user", which is why assigned tasks never appeared.
+       */
       page?: number;
       limit?: number;
       search?: string;
@@ -50,13 +54,12 @@ export const getAllTasks = createAsyncThunk(
       end_date?: string;
       sortBy?: string;
       sortOrder?: "ASC" | "DESC" | "asc" | "desc";
-    } = { viewType: "compact", id: null, page: 1, limit: 10 },
+    } = { viewType: "compact", page: 1, limit: 10 },
     { rejectWithValue }: { rejectWithValue: (value: any) => void }
   ) => {
-    const { viewType = "compact", id = null, page, limit, search, status, priority, start_date, end_date, sortBy, sortOrder } = payload;
+    const { viewType = "compact", page, limit, search, status, priority, start_date, end_date, sortBy, sortOrder } = payload;
     try {
       let url = `/task/all?viewType=${viewType}`;
-      if (id) url += `&id=${id}`;
       if (page) url += `&page=${page}`;
       if (limit) url += `&limit=${limit}`;
       if (search) url += `&search=${search}`;
