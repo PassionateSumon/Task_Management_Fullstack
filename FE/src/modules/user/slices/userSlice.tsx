@@ -5,13 +5,17 @@ import type { CreateUserPayload, UserState } from "../types/User.interface";
 const initialState: UserState = {
     user: {},
     workspaceUsers: [],
+    workspaceUsersLoaded: false,
+    workspaceUsersError: null,
     loading: false,
     error: null,
 }
 
 export const getWorkspaceUsers = createAsyncThunk("user/getWorkspaceUsers", async (_, { rejectWithValue }) => {
     try {
-        const res = await axiosInstance.get('/user/all?page=1&limit=100');
+        const res = await axiosInstance.get('/user/all?page=1&limit=100', {
+            headers: { "X-Skip-Loader": "true" },
+        });
         const responseData = (res as any)?.data;
         return Array.isArray(responseData?.data)
             ? responseData.data
@@ -126,14 +130,17 @@ const UserSlice = createSlice({
                 .addCase(getWorkspaceUsers.pending, (state) => {
                 state.loading = true;
                 state.error = null;
+                state.workspaceUsersError = null;
             })
                 .addCase(getWorkspaceUsers.fulfilled, (state, action) => {
                     state.workspaceUsers = action.payload || [];
                 state.loading = false;
+                state.workspaceUsersLoaded = true;
             })
                 .addCase(getWorkspaceUsers.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
+                state.workspaceUsersError = action.payload as string;
             })
                 .addCase(getUser.pending, (state) => {
                     state.loading = true;
