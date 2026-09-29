@@ -1,10 +1,14 @@
-import { useState, useEffect, useRef, type ChangeEvent } from "react";
+import { useState, useEffect, useMemo, useRef, type ChangeEvent } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { createTask, getSingleTask, refetchTasks, updateTask } from "../slices/TaskSlice";
 import { getWorkspaceUsers } from "../../user/slices/userSlice";
 import type { AppDispatch, RootState } from "../../../store/store";
 import { toast } from "react-toastify";
 import type { ExtendedTaskModalProps } from "../types/Task.interface";
+import {
+  mergeAssigneeOptions,
+  taskAssigneeOptions as getTaskAssigneeOptions,
+} from "../../../common/utils/assigneeOptions";
 import { X, Calendar, Flag, Tag, Trash2, Edit3, Save, Info } from "lucide-react";
 import { Autocomplete, Avatar, Chip, TextField } from "@mui/material";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
@@ -28,14 +32,34 @@ const TaskModal = ({
 
   const dispatch = useDispatch<AppDispatch>();
   const { loading } = useSelector((state: RootState) => state.task);
-  const { workspaceUsers, loading: workspaceUsersLoading } = useSelector((state: RootState) => state.user);
-  const modalRef = useRef<HTMLDivElement>(null);
+  const {
+    workspaceUsers,
+    workspaceUsersLoaded,
+    loading: workspaceUsersLoading,
+    workspaceUsersError,
+  } = useSelector((state: RootState) => state.user);  const modalRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      dispatch(getWorkspaceUsers());
-    }
-  }, [dispatch, isOpen]);
+  const taskAssigneeOptions = useMemo(
+    () => getTaskAssigneeOptions(task),
+    [task]
+  );
+
+  /**
+   * Options for the assignee picker: the full member list once it has been
+   * loaded, unioned with whoever the task already had.
+   */
+  const assigneeOptions = useMemo(
+    () => mergeAssigneeOptions(workspaceUsers, taskAssigneeOptions),
+    [workspaceUsers, taskAssigneeOptions]
+  );
+
+  /**
+   * Lazy-loads the member list the first time the picker is actually used.
+   */
+  const handleAssigneeOpen = () => {
+    if (workspaceUsersLoaded || workspaceUsersLoading) return;
+    dispatch(getWorkspaceUsers());
+  };
 
   useEffect(() => {
     if (task && (mode === "edit" || mode === "view")) {
@@ -238,17 +262,24 @@ const TaskModal = ({
               multiple
               disableCloseOnSelect
               disablePortal
-              options={workspaceUsers}
-              value={workspaceUsers.filter((member) => formData.assignee_ids.includes(String(member.id)))}
+              options={assigneeOptions}
+              value={assigneeOptions.filter((member) => formData.assignee_ids.includes(String(member.id)))}
               onChange={(_, selectedUsers) => setFormData((previous) => ({
                 ...previous,
                 assignee_ids: selectedUsers.map((member) => String(member.id)),
               }))}
+              onOpen={handleAssigneeOpen}
               getOptionLabel={(option) => option.name || option.email || "Unnamed user"}
               isOptionEqualToValue={(option, value) => option.id === value.id}
               loading={workspaceUsersLoading}
               disabled={isViewMode}
-              noOptionsText="No workspace members found"
+              noOptionsText={
+                workspaceUsersLoading
+                  ? "Loading workspace members..."
+                  : workspaceUsersError
+                    ? "Could not load workspace members"
+                    : "No workspace members found"
+              }
               renderTags={(selected, getTagProps) => selected.map((member, index) => (
                 <Chip
                   {...getTagProps({ index })}

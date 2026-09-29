@@ -95,7 +95,21 @@ export const getSingleTask = createAsyncThunk(
   "task/getSingleTask",
   async (id: number, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.get(`/task/single/${id}`);
+      const response = await axiosInstance.get(`/task/single/${id}`, {
+        /**
+         * Suppresses the app-wide `CustomLoader`.
+         *
+         * This is the edit-modal twin of the same defect fixed on
+         * `getWorkspaceUsers`: the modal is already open and interactive when
+         * this fires, and the global loader painted a full-screen spinner over
+         * it, hiding the form until the detail request came back.
+         *
+         * The modal populates itself from the selected list row first and
+         * refines it when this resolves, so there is no gap that needs covering
+         * -- and on failure the row data simply stands.
+         */
+        headers: { "X-Skip-Loader": "true" },
+      });
       return response;
     } catch (error: any) {
       return rejectWithValue(
