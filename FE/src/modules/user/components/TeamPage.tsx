@@ -61,9 +61,9 @@ const TeamPage = () => {
     );
   });
 
-  const nameFor = (roleId?: string) =>
-    roles?.find((r) => String(r.id) === String(roleId))?.name ??
-    DEFAULT_ROLE_NAME;
+  // const nameFor = (roleId?: string) =>
+  //   roles?.find((r) => String(r.id) === String(roleId))?.name ??
+  //   DEFAULT_ROLE_NAME;
 
   return (
     <div className="h-[94vh] overflow-y-auto thin-scrollbar bg-[#F3F4FE] p-6">
@@ -183,7 +183,7 @@ const TeamPage = () => {
                         </select>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-[#5A67D8]">
-                          {nameFor((user as any).role_id)}
+                          {user?.user_type?.toUpperCase() ?? DEFAULT_ROLE_NAME.toUpperCase()}
                         </span>
                       )}
                     </div>
