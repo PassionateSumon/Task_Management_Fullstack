@@ -19,6 +19,22 @@ export default (sequelize: any, DataType: any) => {
         type: DataType.INTEGER,
         allowNull: false,
       },
+      /**
+       * The workspace that owns this task.
+       *
+       * This is the tenant key. It used to be absent, which meant a task's
+       * workspace could only be inferred from its creator -- so the board query
+       * had no way to say "every task in my workspace" and fell back to
+       * `user_id = caller` (own tasks only), and by-id lookups were not
+       * workspace-scoped at all.
+       *
+       * `user_id` is retained as "who created this", which is a real, separate
+       * fact from tenancy and is still used for the duplicate check and audit.
+       */
+      workspace_id: {
+        type: DataType.INTEGER,
+        allowNull: false,
+      },
       assignee_id: {
         type: DataType.INTEGER,
         allowNull: true,
@@ -54,6 +70,12 @@ export default (sequelize: any, DataType: any) => {
     Task.belongsTo(models.User, {
       foreignKey: "user_id",
       as: "user",
+    });
+    // Tenant key. `Status` uses the same workspace-scoped tenancy model, so a
+    // task and the status it sits in always share a workspace.
+    Task.belongsTo(models.Workspace, {
+      foreignKey: "workspace_id",
+      as: "workspace",
     });
     Task.belongsTo(models.User, {
       foreignKey: "assignee_id",

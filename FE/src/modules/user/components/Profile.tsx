@@ -4,12 +4,34 @@ import { useEffect, useState, type ChangeEvent, type ReactNode } from "react";
 import { getUser, updateUser } from "../slices/userSlice";
 import { Mail, UserCog, BadgeCheck, Edit3, Save, X, Calendar, Shield } from "lucide-react";
 
+const formatDate = (value?: string): string => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
+
 const Profile = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.user) as any;
+  const assignedRole = useSelector(
+    (state: RootState) =>
+      (state.auth as any)?.assignedRole as { name?: string } | null
+  );
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ name: "" });
+
+  const name = (user?.name as string) || "Loading…";
+  const username = (user?.username as string) || "—";
+  const email = (user?.email as string) || "—";
+  const roleLabel = assignedRole?.name || (user?.user_type as string) || "—";
+  const isActive = user?.isActive;
+  const memberSince = formatDate(user?.createdAt as string | undefined);
 
   useEffect(() => {
     dispatch(getUser({ id: null }));
@@ -30,7 +52,7 @@ const Profile = () => {
 
   const handleCancel = () => {
     setIsEditing(false);
-    setFormData({ name: user.name });
+    setFormData({ name: (user?.name as string) || "" });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -105,10 +127,10 @@ const Profile = () => {
                 />
               ) : (
                 <h2 className="text-xl font-bold text-gray-900 tracking-tight">
-                  {user.name}
+                  {name}
                 </h2>
               )}
-              <p className="text-sm text-gray-400 mt-1">@{user.username}</p>
+              <p className="text-sm text-gray-400 mt-1">@{username}</p>
             </div>
           </div>
         </div>
@@ -123,19 +145,19 @@ const Profile = () => {
             <DetailRow
               icon={<Mail className="w-4 h-4 text-[#5A67D8]" />}
               label="Email"
-              value={user.email}
+              value={email}
             />
             <DetailRow
               icon={<UserCog className="w-4 h-4 text-[#5A67D8]" />}
               label="Username"
-              value={`@${user.username}`}
+              value={`@${username}`}
             />
             <DetailRow
               icon={<BadgeCheck className="w-4 h-4 text-[#5A67D8]" />}
               label="Role"
               value={
                 <span className="capitalize inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-[#5A67D8]">
-                  {user.user_type}
+                  {roleLabel}
                 </span>
               }
             />
@@ -143,7 +165,9 @@ const Profile = () => {
               icon={<Shield className="w-4 h-4 text-[#5A67D8]" />}
               label="Account Status"
               value={
-                user.isActive ? (
+                isActive === undefined ? (
+                  <span className="text-sm text-gray-400">—</span>
+                ) : isActive ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
                     Active
@@ -159,11 +183,7 @@ const Profile = () => {
             <DetailRow
               icon={<Calendar className="w-4 h-4 text-[#5A67D8]" />}
               label="Member Since"
-              value={new Date(user.createdAt).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+              value={memberSince}
             />
           </div>
         </div>

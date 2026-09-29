@@ -1,4 +1,5 @@
 import {
+  changePasswordHandler,
   loginHandler,
   logoutHandler,
   myHandler,
@@ -9,6 +10,7 @@ import {
   signupHandler,
 } from "../controller/auth.controller.js";
 import {
+  changePasswordPayloadSchema,
   loginPayloadSchema,
   otpCheckPayloadSchema,
   otpSendPayloadSchema,
@@ -132,6 +134,29 @@ export default [
         "hapi-swagger": {
           security: [{ cookieAuth: [] }],
         },
+      },
+    },
+  },
+  {
+    method: "PUT",
+    path: `${prefix}/change-password`,
+    handler: changePasswordHandler,
+    options: {
+      auth: "jwt_access",
+      tags: ["api", "auth"],
+      description:
+        "Change the authenticated user's own password. Revokes all existing sessions on success.",
+      plugins: {
+        "hapi-swagger": {
+          security: [{ cookieAuth: [] }],
+        },
+      },
+      validate: {
+        payload: changePasswordPayloadSchema,
+      },
+      payload: {
+        parse: true,
+        output: "data",
       },
     },
   },

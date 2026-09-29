@@ -1,5 +1,21 @@
 import type { AppDispatch } from "../../../store/store";
 
+/**
+ * Which task mutations the signed-in user is allowed to perform.
+ *
+ * These are a UX affordance only, resolved once in `TaskPage` from
+ * `state.auth.permissions` and threaded down to the views and the modal. Hiding
+ * a button the user cannot use is not a security control.
+ */
+export interface TaskPermissionFlags {
+  /** `task.create` -- the "Add Task" button and the modal's Create action. */
+  canCreate: boolean;
+  /** `task.update` -- edit affordances and moving a card between columns. */
+  canEdit: boolean;
+  /** `task.delete` -- every destructive affordance. */
+  canDelete: boolean;
+}
+
 export interface Task {
   id: number;
   task_name: string;
@@ -18,7 +34,11 @@ export interface Task {
 
 export interface TaskQueryParams {
   viewType?: "kanban" | "compact" | "calendar" | "table";
-  id?: number | null;
+  /**
+   * Removed. The board is workspace-wide, so there is no per-user filter to
+   * pass. The backend rejects `id` on `/task/all` now that it is gone from the
+   * validation schema.
+   */
   page?: number;
   limit?: number;
   search?: string;
@@ -56,6 +76,8 @@ export interface ExtendedTaskModalProps extends TaskModalProps {
   handleEditTask: (task: Task) => void;
   handleDeleteTask: (taskId: number) => void;
   dispatch: AppDispatch;
+  /** Gates the Create/Save/Delete/Edit actions inside the modal. */
+  permissions: TaskPermissionFlags;
 }
 
 export interface KanbanViewProps {
@@ -68,6 +90,8 @@ export interface KanbanViewProps {
   handleEditTask: (task: any) => void;
   handleDeleteTask: (taskId: number) => void;
   dispatch: AppDispatch;
+  /** Gates the per-card actions and drag-to-change-status. */
+  permissions: TaskPermissionFlags;
 }
 
 export interface CollapsedViewProps {
@@ -83,6 +107,8 @@ export interface CollapsedViewProps {
   toggleStatus: (status: string) => void;
   toggleTask: (taskId: string) => void;
   dispatch: AppDispatch;
+  /** Gates the per-row actions and drag-to-change-status. */
+  permissions: TaskPermissionFlags;
 }
 
 export interface CalendarViewProps {
@@ -110,6 +136,8 @@ export interface TableViewProps {
   handleOpenModal: (mode: "add" | "view" | "edit", task?: any) => void;
   handleEditTask: (task: any) => void;
   handleDeleteTask: (taskId: number) => void;
+  /** Gates the per-row actions column. */
+  permissions: TaskPermissionFlags;
 }
 
 // export interface Task {

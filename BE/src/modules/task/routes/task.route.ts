@@ -12,6 +12,7 @@ import {
   taskIdParamSchema,
   taskGetAllParamSchema,
 } from "../validation/task.validation.js";
+import { PermissionGuard } from "../../../common/utils/PermissionGuard.js";
 
 const prefix = "/task";
 
@@ -25,6 +26,10 @@ export default [
       tags: ["api", "task"],
       description: "Create task",
       plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
+      // Every task route is now permission-gated. Previously all five were
+      // auth-only, so the seeded `task.*` permissions were never enforced and
+      // any authenticated user could read and write tasks regardless of role.
+      pre: [PermissionGuard.require("task.create")],
       validate: {
         payload: createTaskPayloadSchema,
       },
@@ -43,6 +48,7 @@ export default [
       tags: ["api", "task"],
       description: "Get all task",
       plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
+      pre: [PermissionGuard.require("task.view")],
       validate: {
         query: taskGetAllParamSchema,
       },
@@ -57,6 +63,7 @@ export default [
       tags: ["api", "task"],
       description: "Get single task",
       plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
+      pre: [PermissionGuard.require("task.view")],
       validate: {
         params: taskIdParamSchema,
       },
@@ -71,6 +78,7 @@ export default [
       tags: ["api", "task"],
       description: "Update task",
       plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
+      pre: [PermissionGuard.require("task.update")],
       validate: {
         params: taskIdParamSchema,
         payload: updateTaskPayloadSchema,
@@ -91,6 +99,7 @@ export default [
       tags: ["api", "task"],
       description: "Delete task",
       plugins: { "hapi-swagger": { security: [{ cookieAuth: [] }] } },
+      pre: [PermissionGuard.require("task.delete")],
       validate: {
         params: taskIdParamSchema,
       },

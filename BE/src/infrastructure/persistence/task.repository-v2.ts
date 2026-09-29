@@ -22,6 +22,19 @@ const NOT_COMPLETED_STATUS_WHERE = {
 // limit=999999 and force the DB to materialize the entire table.
 const MAX_PAGE_LIMIT = 100;
 
+/**
+ * The only User columns a task response is allowed to embed for its assignees.
+ *
+ * Shared by the board query and the by-id lookups so the two cannot drift --
+ * they previously carried separate literal lists, which is how the board and
+ * `/task/single` ended up disagreeing about what a task discloses.
+ *
+ * Identity only. `email`, `user_type` and `workspace_id` are user details that a
+ * `task.view` holder has no permission to read; they belong to `GET /user/all`,
+ * which is gated on `user.view`. See the include sites for the full reasoning.
+ */
+const ASSIGNEE_IDENTITY_ATTRIBUTES = ["id", "name"];
+
 export class TaskRepositoryV2 implements ITaskWriter {
   constructor(private readonly db: DbRegistry) {}
 
@@ -35,11 +48,19 @@ export class TaskRepositoryV2 implements ITaskWriter {
     });
   }
 
+  /**
+   * Duplicate check for task creation.
+   *
+   * Scoped to the WORKSPACE, not the creator. On a workspace-wide board two
+   * people creating a same-named task in the same status is a genuine collision
+   * the user would see as a duplicate, so keying this on `user_id` let the same
+   * name/status pair exist repeatedly depending on who created it.
+   */
   async findDuplicate(
     params: {
       task_name: string;
       status_id: unknown;
-      user_id: number;
+      workspace_id: number;
     },
     transaction?: Transaction,
   ) {
@@ -72,8 +93,23 @@ export class TaskRepositoryV2 implements ITaskWriter {
     return value.replace(/[\\%_]/g, (char) => `\\${char}`);
   }
 
-  async findAllForUser(
-    userKey: number | string | null | undefined,
+  /**
+   * Every task in a workspace, optionally filtered.
+   *
+   * Visibility is workspace-scoped by design: a task belongs to a workspace, so
+   * any member of that workspace may read it regardless of who created it or
+   * who it is assigned to. Authorization (`task.view`) is enforced one layer up
+   * by `PermissionGuard`; this method is responsible only for tenancy.
+   *
+   * The previous signature took a user id and filtered `WHERE user_id = <caller>`,
+   * which meant a board showed only tasks the caller had created. Assignment was
+   * written to `TaskAssignee` but no filter ever read it, so a task created by
+   * one user and assigned to another was invisible to the assignee -- the
+   * reported bug. `workspaceId` is always resolved server-side from the
+   * authenticated user, never from a client-supplied value.
+   */
+  async findAllInWorkspace(
+    workspaceId: number,
     options?: {
       page?: number;
       limit?: number;
@@ -87,11 +123,10 @@ export class TaskRepositoryV2 implements ITaskWriter {
     },
     transaction?: Transaction,
   ) {
-    const where: any = {};
-
-    if (userKey) {
-      where.user_id = userKey;
-    }
+    // The tenant predicate is mandatory, not optional. There is deliberately no
+    // branch that omits it: a workspace-wide read with no tenant filter would
+    // return every tenant's tasks.
+    const where: any = { workspace_id: workspaceId };
 
     if (options?.search) {
       const escaped = this.escapeLikePattern(options.search);
@@ -113,16 +148,33 @@ export class TaskRepositoryV2 implements ITaskWriter {
       attributes: ["id", "name", "is_final", "is_system"],
     };
 
+    /**
+     * Assignee identity, and NOTHING else.
+     *
+     * A task must say *who* it is assigned to, because a board with no visible
+     * assignees is not usable. But the task payload is readable by anyone holding
+     * `task.view`, which is a much weaker permission than `user.view` -- and
+     * until this was narrowed, a `task.view`-only user who was correctly denied
+     * `GET /user/all` could still read every assignee's `email`, `user_type` and
+     * `workspace_id` straight out of a task, which is exactly the "learn user
+     * details without the permission" path this projection used to be.
+     *
+     * So: `id` + `name` only. The assignee *picker* is unaffected -- it is
+     * populated from `GET /user/all`, which is still gated on `user.view`, so
+     * full user records remain available to callers who are allowed to have
+     * them. Do not widen this list without checking that the field is genuinely
+     * needed to render a task, not just convenient.
+     */
     const assigneeInclude: any = {
       model: this.db.User,
       as: "assignee",
-      attributes: ["id", "name", "email", "user_type", "workspace_id"],
+      attributes: ASSIGNEE_IDENTITY_ATTRIBUTES,
       required: false,
     };
     const assigneesInclude: any = {
       model: this.db.User,
       as: "assignees",
-      attributes: ["id", "name", "email", "user_type", "workspace_id"],
+      attributes: ASSIGNEE_IDENTITY_ATTRIBUTES,
       through: { attributes: [] },
       required: false,
     };
@@ -150,6 +202,14 @@ export class TaskRepositoryV2 implements ITaskWriter {
 
     const queryOptions: any = {
       where,
+      // `createdAt` and `updatedAt` must stay in this list even though no caller
+      // selects them. `viewType=table` is the only view that paginates, and with
+      // a `limit` plus an `include` Sequelize rewrites the query to select FROM
+      // a derived table that projects only these attributes. The default `order`
+      // below still references `createdAt`, so omitting it from this list made
+      // MySQL fail with "Unknown column 'Task.createdAt' in 'order clause'"
+      // (ER_BAD_FIELD_ERROR), which the service surfaced as a 500 "Internal
+      // server error" on the task table view. Do not trim these.
       attributes: [
         "id",
         "task_name",
@@ -161,6 +221,9 @@ export class TaskRepositoryV2 implements ITaskWriter {
         "completed_date",
         "user_id",
         "assignee_id",
+        "workspace_id",
+        "createdAt",
+        "updatedAt",
       ],
       include: [statusInclude, assigneeInclude, assigneesInclude],
       transaction,
@@ -181,10 +244,20 @@ export class TaskRepositoryV2 implements ITaskWriter {
    * Shared implementation for the three previously-duplicated
    * find-by-id-with-status lookups. Behavior is identical to the original
    * findOneWithStatus / findByIdWithStatusJoin / findOneWithStatusAlias.
+   *
+   * `workspaceId` is REQUIRED and always applied. The original looked up by
+   * bare `id`, which meant any authenticated user could read, update or delete a
+   * task in any other workspace by guessing an id -- verified live, including
+   * deleting another tenant's task. Tenancy belongs in the query, not in a
+   * caller-side check that is easy to forget.
    */
-  private async findTaskWithStatusById(id: number, transaction?: Transaction) {
+  private async findTaskWithStatusById(
+    id: number,
+    workspaceId: number,
+    transaction?: Transaction,
+  ) {
     return this.db.Task.findOne({
-      where: { id },
+      where: { id, workspace_id: workspaceId },
       include: [
         {
           model: this.db.Status,
@@ -194,13 +267,15 @@ export class TaskRepositoryV2 implements ITaskWriter {
         {
           model: this.db.User,
           as: "assignee",
-          attributes: ["id", "name", "email", "user_type", "workspace_id"],
+          // Same identity-only projection as the board query -- see
+          // ASSIGNEE_IDENTITY_ATTRIBUTES.
+          attributes: ASSIGNEE_IDENTITY_ATTRIBUTES,
           required: false,
         },
         {
           model: this.db.User,
           as: "assignees",
-          attributes: ["id", "name", "email", "user_type", "workspace_id"],
+          attributes: ASSIGNEE_IDENTITY_ATTRIBUTES,
           through: { attributes: [] },
           required: false,
         },
@@ -209,34 +284,41 @@ export class TaskRepositoryV2 implements ITaskWriter {
     });
   }
 
-  // All three kept as public methods (same names/signatures) so nothing
-  // calling this repository needs to change.
-  async findOneWithStatus(id: number, transaction?: Transaction) {
-    return this.findTaskWithStatusById(id, transaction);
+  // All three kept as public methods (same names) so nothing calling this
+  // repository needs to change. Each now takes the caller's workspace and
+  // scopes the lookup to it.
+  async findOneWithStatus(id: number, workspaceId: number, transaction?: Transaction) {
+    return this.findTaskWithStatusById(id, workspaceId, transaction);
   }
 
-  async findByIdWithStatusJoin(id: number, transaction?: Transaction) {
-    return this.findTaskWithStatusById(id, transaction);
+  async findByIdWithStatusJoin(id: number, workspaceId: number, transaction?: Transaction) {
+    return this.findTaskWithStatusById(id, workspaceId, transaction);
   }
 
-  async findOneWithStatusAlias(id: number, transaction?: Transaction) {
-    return this.findTaskWithStatusById(id, transaction);
+  async findOneWithStatusAlias(id: number, workspaceId: number, transaction?: Transaction) {
+    return this.findTaskWithStatusById(id, workspaceId, transaction);
   }
 
-  async findById(id: number, transaction?: Transaction) {
-    return this.db.Task.findOne({ where: { id }, transaction });
+  async findById(id: number, workspaceId: number, transaction?: Transaction) {
+    return this.db.Task.findOne({ where: { id, workspace_id: workspaceId }, transaction });
   }
 
+  /**
+   * `workspace_id` is part of the WHERE clause, not just the SET, so a caller
+   * can never repoint a task at another workspace (or edit one it does not own)
+   * by passing a crafted payload.
+   */
   async updateById(
     id: number,
+    workspaceId: number,
     data: Record<string, unknown>,
     transaction?: Transaction,
   ) {
-    return this.db.Task.update(data, { where: { id }, transaction });
+    return this.db.Task.update(data, { where: { id, workspace_id: workspaceId }, transaction });
   }
 
-  async destroyById(id: number, transaction?: Transaction) {
-    return this.db.Task.destroy({ where: { id }, transaction });
+  async destroyById(id: number, workspaceId: number, transaction?: Transaction) {
+    return this.db.Task.destroy({ where: { id, workspace_id: workspaceId }, transaction });
   }
 
   async nullCompletedDateForTasksInStatus(
@@ -647,19 +729,45 @@ export class TaskRepositoryV2 implements ITaskWriter {
     });
   }
 
-  async findAllForUserWithStatus(userId: number, transaction?: Transaction) {
+  /**
+   * Task rows for the personal dashboard, with their status attached.
+   *
+   * WORKSPACE-scoped, matching `findAllInWorkspace` and therefore the board
+   * itself. This was `WHERE user_id = <caller>` ("tasks I created"), which after
+   * the board became workspace-wide made the two disagree: a member whose board
+   * showed 12 tasks had a dashboard reporting 0. A dashboard that contradicts
+   * the page it summarises is worse than no dashboard, so both now read the same
+   * set.
+   *
+   * Status is joined but only for its `is_final` / `name` flags, which the
+   * service uses to decide what counts as completed. No User columns are
+   * selected at all here, so this cannot leak assignee details.
+   */
+  async findAllInWorkspaceWithStatus(
+    workspaceId: number,
+    transaction?: Transaction,
+  ) {
     return this.db.Task.findAll({
-      where: { user_id: userId },
-      include: [{ model: this.db.Status, as: "status" }],
+      where: { workspace_id: workspaceId },
+      include: [
+        {
+          model: this.db.Status,
+          as: "status",
+          attributes: ["id", "name", "is_final", "is_system"],
+        },
+      ],
       transaction,
     });
   }
 
-  async findGroupedByStatusForUser(userId: number, transaction?: Transaction) {
+  async findGroupedByStatusInWorkspace(
+    workspaceId: number,
+    transaction?: Transaction,
+  ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
-      where: { user_id: userId },
-      include: [{ model: this.db.Status, as: "status" }],
+      where: { workspace_id: workspaceId },
+      include: [{ model: this.db.Status, as: "status", attributes: [] }],
       attributes: ["status_id", [sequelize.literal("COUNT(*)"), "count"]],
       group: "status_id",
       raw: true,
@@ -667,14 +775,14 @@ export class TaskRepositoryV2 implements ITaskWriter {
     });
   }
 
-  async findGroupedByPriorityForUser(
-    userId: number,
+  async findGroupedByPriorityInWorkspace(
+    workspaceId: number,
     transaction?: Transaction,
   ) {
     const { sequelize } = this.db;
     return this.db.Task.findAll({
+      where: { workspace_id: workspaceId },
       attributes: ["priority", [sequelize.literal("COUNT(*)"), "count"]],
-      where: { user_id: userId },
       group: "priority",
       raw: true,
       transaction,

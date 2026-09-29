@@ -9,6 +9,29 @@ import { getAppContainer } from "../../../composition/app-container.js";
 
 const auth = () => getAppContainer().authService;
 
+export const changePasswordHandler = async (
+  req: Request,
+  h: ResponseToolkit
+) => {
+  try {
+    // The acting user comes from the validated session, never from the payload.
+    const { userId } = req.auth.credentials as any;
+    const payload = req.payload as {
+      currentPassword: string;
+      newPassword: string;
+      confirmNewPassword: string;
+    };
+
+    const result = await auth().changePassword(userId, payload, h);
+    if (result.statusCode !== 200 && result.statusCode !== 201)
+      return error(null, result.message, result.statusCode)(h);
+
+    return success(null, result.message, 200)(h);
+  } catch (err: any) {
+    return error(null, err.message || "Internal server error", 500)(h);
+  }
+};
+
 export const signupHandler = async (req: Request, h: ResponseToolkit) => {
   try {
     const payload = req.payload as signupPayload;

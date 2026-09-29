@@ -16,7 +16,11 @@ interface ExtendedTableViewProps extends TableViewProps {
   onSort?: (field: string) => void;
 }
 
-const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, handleEditTask, handleDeleteTask, sortBy, sortOrder, onSort }: ExtendedTableViewProps) => {
+const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, handleEditTask, handleDeleteTask, permissions, sortBy, sortOrder, onSort }: ExtendedTableViewProps) => {
+
+  const { canEdit, canDelete } = permissions;
+  /** A read-only user gets no actions column at all, rather than an empty one. */
+  const hasActions = canEdit || canDelete;
 
   const columns = useMemo<ColumnDef<any>[]>(() => [
     {
@@ -101,27 +105,35 @@ const TableView = ({ tasks, loading, error, getStatusStyle, handleOpenModal, han
         ) : <span className="text-gray-300 text-xs">—</span>;
       },
     },
-    {
-      id: "actions",
-      header: "",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1 justify-end">
-          <button
-            onClick={() => handleEditTask(row.original)}
-            className="p-1.5 rounded-md text-gray-400 hover:text-[#5A67D8] hover:bg-indigo-50 transition-colors cursor-pointer"
-          >
-            <Edit2 size={14} />
-          </button>
-          <button
-            onClick={() => handleDeleteTask(row.original.id)}
-            className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      ),
-    },
-  ], [getStatusStyle, handleOpenModal, handleEditTask, handleDeleteTask]);
+    ...(hasActions
+      ? [
+          {
+            id: "actions",
+            header: "",
+            cell: ({ row }: any) => (
+              <div className="flex items-center gap-1 justify-end">
+                {canEdit && (
+                  <button
+                    onClick={() => handleEditTask(row.original)}
+                    className="p-1.5 rounded-md text-gray-400 hover:text-[#5A67D8] hover:bg-indigo-50 transition-colors cursor-pointer"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={() => handleDeleteTask(row.original.id)}
+                    className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ),
+          },
+        ]
+      : []),
+  ], [getStatusStyle, handleOpenModal, handleEditTask, handleDeleteTask, canEdit, canDelete, hasActions]);
 
   const table = useReactTable({ data: tasks || [], columns, getCoreRowModel: getCoreRowModel() });
 

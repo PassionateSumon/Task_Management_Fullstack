@@ -1,5 +1,6 @@
 import type { Request, ResponseToolkit } from "@hapi/hapi";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -27,7 +28,13 @@ export class JWTUtil {
   static generateRefreshToken = (userId: number, roleId: string) => {
     if (!REFRESH_SECRET) throw new Error("Access secret key not found!");
     try {
-      return (jwt as any).sign({ userId, roleId }, REFRESH_SECRET, {
+      // `jti` makes every issued refresh token unique. Without it, the payload
+      // is only `{userId, roleId, iat, exp}` and `iat` has second resolution, so
+      // two logins by the same user inside the same second produce byte-identical
+      // tokens. `RefreshToken.token` is UNIQUE, so the second insert failed and
+      // login returned 500. This mattered in practice for the new manual-user
+      // flow, where a freshly created user is expected to sign in immediately.
+      return (jwt as any).sign({ userId, roleId, jti: randomUUID() }, REFRESH_SECRET, {
         expiresIn: REFRESH_EXPIRES,
       });
     } catch (error) {

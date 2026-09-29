@@ -6,6 +6,8 @@ import { loginMiddleware } from "./middleware/loginMiddleware";
 import StatusSlice from "../modules/status/slices/StatusSlice";
 import UserSlice from "../modules/user/slices/userSlice";
 import DashboardSlice from "../modules/dashboard/slices/dashboardSlice";
+import RoleSlice from "../modules/role/slices/RoleSlice";
+import PermissionSlice from "../modules/permission/slices/PermissionSlice";
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +16,8 @@ export const store = configureStore({
     status: StatusSlice.reducer,
     dashboard: DashboardSlice.reducer,
     user: UserSlice.reducer,
+    role: RoleSlice.reducer,
+    permission: PermissionSlice.reducer,
   },
   middleware: (getdefaultMiddleware) => {
     return getdefaultMiddleware().concat(loginMiddleware, logoutMiddleware);

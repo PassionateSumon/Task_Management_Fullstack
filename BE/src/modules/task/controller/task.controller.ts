@@ -33,7 +33,8 @@ export const getAllTaskHandler = async (req: Request, h: ResponseToolkit) => {
       | "compact"
       | "calendar"
       | "table";
-    const reqUserId = req.query.id as string | null;
+    // The client-supplied `id` filter is gone; the board is workspace-wide and
+    // the workspace is derived server-side from the caller's own row.
     const {
       page,
       limit,
@@ -50,7 +51,7 @@ export const getAllTaskHandler = async (req: Request, h: ResponseToolkit) => {
       viewType,
       userId,
       roleId,
-      reqUserId,
+      null,
       {
         page,
         limit,
@@ -76,8 +77,11 @@ export const getSingleTaskHandler = async (
   h: ResponseToolkit,
 ) => {
   try {
+    const { userId } = req.auth.credentials as any;
     const id = req.params.id as number;
-    const result = await task().getSingleTask({ id });
+    // The caller's id is required so the service can scope the lookup to the
+    // caller's workspace.
+    const result = await task().getSingleTask({ id }, userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Task fetched successfully", 200)(h);
@@ -88,6 +92,7 @@ export const getSingleTaskHandler = async (
 
 export const updateTaskHandler = async (req: Request, h: ResponseToolkit) => {
   try {
+    const { userId } = req.auth.credentials as any;
     const id = req.params.id as number;
     const payload = req.payload as {
       name?: string;
@@ -98,7 +103,7 @@ export const updateTaskHandler = async (req: Request, h: ResponseToolkit) => {
       end_date?: string;
       assignee_ids?: number[];
     };
-    const result = await task().updateTask(id, payload);
+    const result = await task().updateTask(id, payload, userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
     return success(result.data, "Task updated successfully", 200)(h);
@@ -109,11 +114,15 @@ export const updateTaskHandler = async (req: Request, h: ResponseToolkit) => {
 
 export const deleteTaskHandler = async (req: Request, h: ResponseToolkit) => {
   try {
+    const { userId } = req.auth.credentials as any;
     const id = req.params.id as number;
-    const result = await task().deleteTask(id);
+    const result = await task().deleteTask(id, userId);
     if (result.statusCode !== 200 && result.statusCode !== 201)
       return error(null, result.message, result.statusCode)(h);
-    return success(result.data, "Status deleted successfully", 200)(h);
+    // Previously this said "Status deleted successfully" on the task delete
+    // route -- a copy/paste from the status module that made every successful
+    // task deletion look like the wrong resource had been removed.
+    return success(result.data, "Task deleted successfully", 200)(h);
   } catch (err: any) {
     return error(null, err.message || "Internal server error", 500)(h);
   }

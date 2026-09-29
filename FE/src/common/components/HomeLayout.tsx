@@ -9,11 +9,25 @@ import {
   Activity,
   BarChart2,
   ShieldCheck,
+  Users,
+  KeyRound,
+  Lock,
 } from "lucide-react";
+import { hasAnyPermission } from "../utils/permissions";
 
 const HomeLayout = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { role } = useSelector((state: RootState) => state.auth);
+  const { role, assignedRole, permissions } = useSelector(
+    (state: RootState) => state.auth
+  );
+
+  /**
+   * Every entry is permission-gated rather than role-gated, so a user on a
+   * dynamic role sees exactly the areas their role grants. The API re-checks
+   * all of these regardless -- this only shapes the UI.
+   */
+  const canSee = (...required: string[]) =>
+    hasAnyPermission(permissions, ...required);
 
   const navLink = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
@@ -23,6 +37,7 @@ const HomeLayout = () => {
     }`;
 
   const initial = role ? role.charAt(0).toUpperCase() : "U";
+  const roleLabel = assignedRole?.name ?? role ?? "user";
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F3F4FE]">
@@ -49,11 +64,13 @@ const HomeLayout = () => {
               Core Menu
             </p>
             <nav className="flex flex-col gap-0.5">
-              <NavLink to="task" className={navLink}>
-                <CheckSquare className="w-4 h-4 flex-shrink-0" />
-                Tasks
-              </NavLink>
-              {role === "admin" && (
+              {canSee("task.view") && (
+                <NavLink to="task" className={navLink}>
+                  <CheckSquare className="w-4 h-4 flex-shrink-0" />
+                  Tasks
+                </NavLink>
+              )}
+              {canSee("status.view") && (
                 <NavLink to="status" className={navLink}>
                   <Activity className="w-4 h-4 flex-shrink-0" />
                   Status
@@ -72,7 +89,7 @@ const HomeLayout = () => {
                 <BarChart2 className="w-4 h-4 flex-shrink-0" />
                 Personal Board
               </NavLink>
-              {role === "admin" && (
+              {canSee("dashboard.view.admin") && (
                 <NavLink to="dashboard" end className={navLink}>
                   <ShieldCheck className="w-4 h-4 flex-shrink-0" />
                   Admin Board
@@ -80,6 +97,35 @@ const HomeLayout = () => {
               )}
             </nav>
           </div>
+
+          {/* Administration */}
+          {canSee("user.view", "role.view", "permission.view") && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-1.5">
+                Administration
+              </p>
+              <nav className="flex flex-col gap-0.5">
+                {canSee("user.view") && (
+                  <NavLink to="team" className={navLink}>
+                    <Users className="w-4 h-4 flex-shrink-0" />
+                    Team
+                  </NavLink>
+                )}
+                {canSee("role.view") && (
+                  <NavLink to="roles" className={navLink}>
+                    <KeyRound className="w-4 h-4 flex-shrink-0" />
+                    Roles
+                  </NavLink>
+                )}
+                {canSee("permission.view") && (
+                  <NavLink to="permissions" className={navLink}>
+                    <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                    Permissions
+                  </NavLink>
+                )}
+              </nav>
+            </div>
+          )}
         </div>
 
         {/* Bottom — always pinned, never overlaps */}
@@ -97,8 +143,16 @@ const HomeLayout = () => {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold text-gray-800 leading-tight">My Profile</p>
-              <p className="text-[10px] text-gray-400 uppercase tracking-wide">{role}</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide">{roleLabel}</p>
             </div>
+          </NavLink>
+
+          <NavLink
+            to="change-password"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+          >
+            <Lock className="w-4 h-4 flex-shrink-0" />
+            Change Password
           </NavLink>
 
           <button
